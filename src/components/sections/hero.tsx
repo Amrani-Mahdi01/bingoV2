@@ -313,9 +313,10 @@ export function Hero() {
         </svg>
       </div>
 
-      {/* BINGO wordmark — centered, biased upward via padding-bottom so
-          the image piles + promo block sit comfortably below */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-[8vh] text-center sm:pb-[10vh]">
+      {/* BINGO wordmark — centered, biased slightly upward so the
+          image piles + promo block sit below. Less bottom padding =
+          BINGO sits a bit lower in the section. */}
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-[3vh] text-center sm:pb-[5vh]">
         <h1
           id="hero-title"
           className="font-display font-bold leading-[0.86] tracking-[-0.05em] text-forest-900 text-[80px] sm:text-[112px] md:text-[148px] lg:text-[180px]"
