@@ -6,57 +6,38 @@ import { TentLink } from "@/components/ui/tent-link";
 import { cn } from "@/lib/utils";
 
 /**
- * Categories grid — structure modelled exactly on CategoryTile.tsx
- * (photo variant): aspect-square forest panel, full-card decorative
- * fill (in place of the photo until real images are uploaded), dark
- * scrim from forest-950/85 → /15, bottom caption with name +
- * "X produits" + cream-circle arrow.
+ * Categories grid — colorful icon tiles.
+ *
+ * Each tile = a cream rounded square holding one of the brand's flat
+ * PNG icons (public/categories/*.png), with the category name +
+ * product count stacked below. Some PNGs are reused across categories
+ * until dedicated artwork is available.
  */
 
-/* Unsplash photo IDs — replace with your own admin-uploaded photos
-   later. URL form: https://images.unsplash.com/photo-[ID]?w=800&q=80&fit=crop */
-const CATEGORIES: Array<{
+type Category = {
   slug: string;
   name: string;
   productCount: number;
-  image: string;
-}> = [
-  {
-    slug: "sacs-de-couchage",
-    name: "Sacs de couchage",
-    productCount: 24,
-    image: "https://images.unsplash.com/photo-1455763916899-e8b50eca9967?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "tentes",
-    name: "Tentes",
-    productCount: 18,
-    image: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "sacs-a-dos",
-    name: "Sacs à dos",
-    productCount: 32,
-    image: "https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "eclairage",
-    name: "Éclairage",
-    productCount: 15,
-    image: "https://images.unsplash.com/photo-1471919743851-c4df8b6ee133?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "navigation",
-    name: "Navigation",
-    productCount: 11,
-    image: "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "campement",
-    name: "Campement",
-    productCount: 28,
-    image: "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=800&q=80&fit=crop",
-  },
+  icon: string;
+};
+
+const CATEGORIES: Category[] = [
+  { slug: "tentes",            name: "Tentes",            productCount: 18, icon: "/categories/camping-tent.png" },
+  { slug: "sacs-a-dos",        name: "Sacs à dos",        productCount: 32, icon: "/categories/backpack.png" },
+  { slug: "chaussures",        name: "Chaussures",        productCount: 24, icon: "/categories/boots.png" },
+  { slug: "eclairage",         name: "Éclairage",         productCount: 15, icon: "/categories/flashlight.png" },
+  { slug: "navigation",        name: "Navigation",        productCount: 11, icon: "/categories/map.png" },
+  { slug: "campement",         name: "Campement",         productCount: 28, icon: "/categories/bonfire.png" },
+  { slug: "sacs-de-couchage",  name: "Sacs de couchage",  productCount: 14, icon: "/categories/camping-tent.png" },
+  { slug: "cuisine",           name: "Cuisine de camp",   productCount: 19, icon: "/categories/bonfire.png" },
+  { slug: "hydratation",       name: "Hydratation",       productCount: 12, icon: "/categories/map.png" },
+  { slug: "vetements",         name: "Vêtements",         productCount: 22, icon: "/categories/backpack.png" },
+  { slug: "rechauds",          name: "Réchauds",          productCount: 9,  icon: "/categories/bonfire.png" },
+  { slug: "couteaux",          name: "Couteaux & outils", productCount: 17, icon: "/categories/map.png" },
+  { slug: "accessoires",       name: "Accessoires",       productCount: 25, icon: "/categories/boots.png" },
+  { slug: "sacs-etanches",     name: "Sacs étanches",     productCount: 8,  icon: "/categories/backpack.png" },
+  { slug: "tapis-matelas",     name: "Tapis & matelas",   productCount: 13, icon: "/categories/camping-tent.png" },
+  { slug: "securite",          name: "Sécurité",          productCount: 7,  icon: "/categories/flashlight.png" },
 ];
 
 export function Categories() {
@@ -74,7 +55,7 @@ export function Categories() {
           ctaHref="/materiel"
         />
 
-        <ul className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 md:mt-12 md:grid-cols-3 md:gap-5 lg:grid-cols-6">
+        <ul className="mt-10 grid grid-cols-3 gap-4 sm:gap-5 md:mt-12 md:grid-cols-6 md:gap-5 lg:grid-cols-8">
           {CATEGORIES.map((c) => (
             <li key={c.slug}>
               <CategoryCard {...c} />
@@ -86,8 +67,7 @@ export function Categories() {
   );
 }
 
-/* ───── Section header — eyebrow + display title + lead + optional CTA
-   (matches the SectionHeader.tsx pattern from the source files) ───── */
+/* ───── Section header — eyebrow + display title + lead + optional CTA ───── */
 function SectionHeader({
   eyebrow,
   title,
@@ -135,55 +115,48 @@ function SectionHeader({
   );
 }
 
-/* ───── Category card — mirrors CategoryTile.tsx (photo variant) ───── */
+/* ───── Category card — colorful icon tile + label stacked below ───── */
 function CategoryCard({
   slug,
   name,
   productCount,
-  image,
-}: {
-  slug: string;
-  name: string;
-  productCount: number;
-  image: string;
-}) {
+  icon,
+}: Category) {
   return (
     <TentLink
       href={`/categorie/${slug}`}
       className={cn(
-        "group relative flex aspect-square flex-col justify-end overflow-hidden rounded-xl bg-forest-900 text-cream",
-        "transition-all hover:-translate-y-0.5 hover:shadow-lg",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
+        "group flex flex-col items-center gap-2.5 text-center",
+        "focus-visible:outline-none"
       )}
     >
-      {/* Background photo — Unsplash */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={image}
-        alt=""
-        aria-hidden
-        loading="lazy"
-        className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
-      />
-
-      {/* Dark scrim — heavier at the bottom where the caption sits */}
+      {/* Icon tile */}
       <div
-        aria-hidden
-        className="absolute inset-0 bg-gradient-to-t from-forest-900/90 via-forest-900/45 to-forest-900/15"
-      />
+        className={cn(
+          "grid aspect-square w-full place-items-center rounded-2xl bg-cream p-8 ring-1 ring-wood-300/40 sm:p-10 md:p-12",
+          "transition-all duration-300 ease-out",
+          "group-hover:-translate-y-0.5 group-hover:bg-cream-deep/60 group-hover:ring-tangerine-500/45",
+          "group-hover:shadow-[0_14px_28px_-14px_rgba(31,58,30,0.3)]",
+          "group-focus-visible:ring-2 group-focus-visible:ring-tangerine-500"
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={icon}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          className="size-full object-contain transition-transform duration-300 group-hover:scale-[1.06]"
+        />
+      </div>
 
-      {/* Caption */}
-      <div className="relative flex items-end justify-between gap-2 p-3 sm:p-5">
-        <div className="min-w-0">
-          <h3 className="font-display text-sm font-semibold leading-tight text-cream sm:text-lg">
-            {name}
-          </h3>
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-cream/75">
-            {productCount} produits
-          </p>
-        </div>
-        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-cream text-tangerine-600 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 sm:size-9">
-          <ArrowUpRight className="size-3.5 sm:size-4" strokeWidth={2.2} />
+      {/* Label + count */}
+      <div className="flex w-full min-w-0 flex-col items-center">
+        <span className="w-full truncate font-display text-[13px] font-semibold leading-tight text-forest-900 transition-colors group-hover:text-tangerine-700 sm:text-sm">
+          {name}
+        </span>
+        <span className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-wood-600">
+          {productCount} produits
         </span>
       </div>
     </TentLink>

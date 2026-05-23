@@ -187,3 +187,29 @@
   .header-marquee-track,
   .header-cart-bounce { animation: none !important; }
 }
+
+/* ─── Branded scrollbar — slim wood-toned thumb on a transparent
+       track. Use `class="bingo-scrollbar"` on any scrollable container. */
+.bingo-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-wood-400) transparent;
+}
+.bingo-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.bingo-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 6px;
+}
+.bingo-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-wood-400);
+  border-radius: 9999px;
+  transition: background-color 200ms ease;
+}
+.bingo-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-tangerine-500);
+}
+.bingo-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}

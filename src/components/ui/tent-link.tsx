@@ -36,6 +36,16 @@ export function TentLink({
       return;
     }
 
+    // If <TentOverlay /> isn't mounted, there's nothing to listen for
+    // our custom event. Fall back to Next.js Link's default behavior
+    // so navigation still works.
+    if (
+      typeof window === "undefined" ||
+      !(window as { __bingoTentActive?: boolean }).__bingoTentActive
+    ) {
+      return;
+    }
+
     event.preventDefault();
     const target =
       typeof href === "string"

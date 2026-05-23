@@ -1,7 +1,9 @@
 import * as React from "react";
 import { ShoppingBag } from "lucide-react";
 
+import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
+import { PRODUCTS } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
 const discountPercent = (price: number, oldPrice?: number) =>
@@ -171,6 +173,7 @@ function ProductCard({
   image: string;
 }) {
   const pct = discountPercent(price, oldPrice);
+  const fullProduct = PRODUCTS.find((p) => p.slug === slug);
   return (
     <TentLink
       href={`/produit/${slug}`}
@@ -190,27 +193,32 @@ function ProductCard({
           className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
         />
 
-        <span className="absolute start-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-tangerine-500 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-cream shadow-sm sm:start-4 sm:top-4">
-          <span
-            aria-hidden
-            className="size-1.5 rounded-full bg-cream"
-            style={{ animation: "newest-dot-pulse 1.8s ease-in-out infinite" }}
-          />
-          Nouveau
-        </span>
-
-        {pct ? (
-          <span className="absolute end-3 top-3 inline-flex items-center rounded-full bg-cream px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-tangerine-700 shadow-sm sm:end-4 sm:top-4">
-            -{pct}%
+        {/* Top-left: "Nouveau" + discount stacked; top-right free for actions. */}
+        <div className="absolute start-3 top-3 z-10 flex flex-col items-start gap-1.5 sm:start-4 sm:top-4">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-tangerine-500 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-cream shadow-sm">
+            <span
+              aria-hidden
+              className="size-1.5 rounded-full bg-cream"
+              style={{ animation: "newest-dot-pulse 1.8s ease-in-out infinite" }}
+            />
+            Nouveau
           </span>
-        ) : null}
+
+          {pct ? (
+            <span className="inline-flex items-center rounded-full bg-cream px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-tangerine-700 shadow-sm">
+              -{pct}%
+            </span>
+          ) : null}
+        </div>
+
+        <ProductActions product={fullProduct} />
       </div>
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
-        <h3 className="font-display text-[14.5px] font-semibold leading-snug text-cream sm:text-base">
+        <h3 className="truncate font-display text-[14.5px] font-semibold leading-snug text-cream sm:text-base">
           {name}
         </h3>
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-cream/65">
+        <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-cream/65">
           {brand}
         </p>
         <div className="mt-3 flex items-baseline gap-2">

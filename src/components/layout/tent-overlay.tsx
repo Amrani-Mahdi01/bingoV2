@@ -28,6 +28,11 @@ export function TentOverlay() {
   const hrefRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
+    // Flag so TentLink can detect whether the overlay is actually
+    // mounted; if it isn't, TentLink falls back to plain Next.js
+    // navigation instead of dispatching an event nobody listens to.
+    (window as { __bingoTentActive?: boolean }).__bingoTentActive = true;
+
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ href: string }>).detail;
       if (!detail?.href) return;
@@ -35,7 +40,10 @@ export function TentOverlay() {
       setPhase("closing");
     };
     window.addEventListener("tent-navigate", handler);
-    return () => window.removeEventListener("tent-navigate", handler);
+    return () => {
+      window.removeEventListener("tent-navigate", handler);
+      (window as { __bingoTentActive?: boolean }).__bingoTentActive = false;
+    };
   }, []);
 
   React.useEffect(() => {

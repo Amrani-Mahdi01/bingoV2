@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono } from "next/font/google";
 
+import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
 import { TentOverlay } from "@/components/layout/tent-overlay";
+import { CartProvider } from "@/lib/cart";
+import { FavoritesProvider } from "@/lib/favorites";
+import { LanguageProvider } from "@/lib/i18n";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -38,12 +42,21 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${dmSans.variable} ${bricolage.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${bricolage.variable} ${jetbrainsMono.variable} h-full scroll-smooth antialiased`}
     >
       <body className="min-h-full flex flex-col bg-cream text-wood-800">
-        <Header />
-        {children}
-        <TentOverlay />
+        <LanguageProvider>
+          <CartProvider>
+            <FavoritesProvider>
+              <Header />
+              {children}
+              <Footer />
+              {/* Tent transition overlay — hidden for now. Re-enable by
+                  uncommenting. Import + component file are kept intact. */}
+              {/* <TentOverlay /> */}
+            </FavoritesProvider>
+          </CartProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

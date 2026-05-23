@@ -5,6 +5,10 @@ export type Product = {
   price: number;
   oldPrice?: number;
   image: string;
+  /** Optional multi-image gallery for the product slider. Defaults to [image]. */
+  images?: string[];
+  /** Category slug — used by the catalogue filters. */
+  categorySlug?: string;
   description: string;
   features: string[];
 };
@@ -18,6 +22,12 @@ export const PRODUCTS: Product[] = [
     oldPrice: 14900,
     image:
       "https://images.unsplash.com/photo-1487730116645-7be521e35813?w=1200&q=85&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1487730116645-7be521e35813?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1455763916899-e8b50eca9967?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+    ],
+    categorySlug: "sacs-de-couchage",
     description:
       "Conçu pour les nuits glaciales en haute montagne — duvet d'oie 850 fill, isolation thermique jusqu'à -18 °C, poids plume de 1,2 kg. Le compagnon de référence du Djurdjura à l'Atlas.",
     features: [
@@ -35,6 +45,12 @@ export const PRODUCTS: Product[] = [
     price: 18900,
     image:
       "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=1200&q=85&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1487730116645-7be521e35813?w=1200&q=85&fit=crop",
+    ],
+    categorySlug: "tentes",
     description:
       "Double paroi imperméable, montage en 5 minutes chrono, deux portes pour ne plus enjamber son binôme. Pensée pour les longues traversées sans concession sur le poids.",
     features: [
@@ -52,6 +68,12 @@ export const PRODUCTS: Product[] = [
     price: 14200,
     image:
       "https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=85&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+    ],
+    categorySlug: "sacs-a-dos",
     description:
       "Le sac de référence pour le trek longue distance. Suspension Anti-Gravity, dos ventilé, ceinture ajustable au degré près. 65 L pensés pour avaler les expéditions de plusieurs semaines.",
     features: [
@@ -70,6 +92,12 @@ export const PRODUCTS: Product[] = [
     oldPrice: 5600,
     image:
       "https://images.unsplash.com/photo-1471919743851-c4df8b6ee133?w=1200&q=85&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1471919743851-c4df8b6ee133?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1487730116645-7be521e35813?w=1200&q=85&fit=crop",
+    ],
+    categorySlug: "eclairage",
     description:
       "Frontale rechargeable polyvalente — 450 lumens en mode large + faisceau focalisé pour les sentiers techniques. Batterie Core remplaçable par 3 piles AAA en dépannage.",
     features: [
@@ -88,6 +116,12 @@ export const PRODUCTS: Product[] = [
     oldPrice: 19500,
     image:
       "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=1200&q=85&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1455763916899-e8b50eca9967?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=85&fit=crop",
+    ],
+    categorySlug: "campement",
     description:
       "Hardshell 3 couches H2No®, taillée pour la pluie alpine. Capuche réglable, fermeture pit-zip pour ventiler en montée. Tissu en nylon recyclé, certifié Fair Trade.",
     features: [
@@ -105,6 +139,12 @@ export const PRODUCTS: Product[] = [
     price: 11200,
     image:
       "https://images.unsplash.com/photo-1517824806704-9040b037703b?w=1200&q=85&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1517824806704-9040b037703b?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=1200&q=85&fit=crop",
+    ],
+    categorySlug: "campement",
     description:
       "Système d'ébullition tout-en-un — 0,5 L en 100 secondes. Tasse isolée FluxRing®, allumage piézo, design empilable. Le réchaud du break-fast au sommet.",
     features: [
@@ -123,6 +163,12 @@ export const PRODUCTS: Product[] = [
     oldPrice: 9900,
     image:
       "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1200&q=85&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1471919743851-c4df8b6ee133?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=85&fit=crop",
+    ],
+    categorySlug: "navigation",
     description:
       "Dix-huit outils, accessibles d'une seule main. Lames en acier 420HC, pince à ressort, brucelles de remplacement. Garantie 25 ans — l'outil pour la vie.",
     features: [
@@ -140,6 +186,12 @@ export const PRODUCTS: Product[] = [
     price: 4200,
     image:
       "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=1200&q=85&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1455763916899-e8b50eca9967?w=1200&q=85&fit=crop",
+      "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+    ],
+    categorySlug: "campement",
     description:
       "Double paroi sous vide TempShield™ — 24 h frais, 12 h chaud. Goulot large pour le café du matin et les glaçons du soir. Inox 18/8 sans BPA, garanti à vie.",
     features: [
@@ -149,6 +201,224 @@ export const PRODUCTS: Product[] = [
       "Goulot large 5,3 cm",
       "Garantie à vie",
     ],
+  },
+  /* ──────────── Catalogue filler — extra products to exercise the
+     filters + pagination. Short descriptions on purpose. ─────────── */
+  {
+    slug: "big-agnes-copper-spur",
+    name: "Tente 2 places haute montagne",
+    brand: "Big Agnes Copper Spur HV UL2",
+    price: 22500,
+    image: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=1200&q=85&fit=crop",
+    categorySlug: "tentes",
+    description: "Tente ultralégère 2 places — double paroi imperméable, deux portes, arceaux DAC Featherlite.",
+    features: ["Poids : 1,4 kg", "Imperméabilité 1500 mm", "Deux portes + auvents", "Arceaux DAC Featherlite"],
+  },
+  {
+    slug: "nemo-hornet-elite-2p",
+    name: "Tente alpine 2 places",
+    brand: "Nemo Hornet Elite OSMO 2P",
+    price: 24500,
+    image: "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+    categorySlug: "tentes",
+    description: "La référence ultralégère pour le trek alpin — tissu OSMO™, montage 4 min.",
+    features: ["Poids : 0,99 kg", "Tissu OSMO™", "Montage en 4 min", "Vestibules doubles"],
+  },
+  {
+    slug: "coleman-sundome-4",
+    name: "Tente familiale 4 places",
+    brand: "Coleman Sundome 4",
+    price: 9500,
+    oldPrice: 11200,
+    image: "https://images.unsplash.com/photo-1487730116645-7be521e35813?w=1200&q=85&fit=crop",
+    categorySlug: "tentes",
+    description: "La grande classique — 4 places, montage en 10 min, technologie WeatherTec™.",
+    features: ["4 places", "Montage en 10 min", "Sol thermosoudé", "Hauteur 1,8 m"],
+  },
+  {
+    slug: "marmot-trestles-30",
+    name: "Sac de couchage synthétique",
+    brand: "Marmot Trestles 30",
+    price: 8200,
+    oldPrice: 9500,
+    image: "https://images.unsplash.com/photo-1455763916899-e8b50eca9967?w=1200&q=85&fit=crop",
+    categorySlug: "sacs-de-couchage",
+    description: "Synthétique 3 saisons — confort jusqu'à -1 °C, idéal pour les nuits humides.",
+    features: ["Isolation SpiraFil™", "Confort -1 °C", "Poids : 1,8 kg", "Capuche ajustable"],
+  },
+  {
+    slug: "sea-to-summit-trek-tkii",
+    name: "Sac de couchage en duvet -5 °C",
+    brand: "Sea to Summit Trek TkII",
+    price: 11500,
+    image: "https://images.unsplash.com/photo-1487730116645-7be521e35813?w=1200&q=85&fit=crop",
+    categorySlug: "sacs-de-couchage",
+    description: "Duvet d'oie 650FP — sac compact pour les expéditions estivales en altitude.",
+    features: ["Duvet d'oie 650FP", "Confort -5 °C", "Poids : 1,1 kg", "Sac de compression"],
+  },
+  {
+    slug: "therm-a-rest-hyperion",
+    name: "Sac de couchage ultraléger -7 °C",
+    brand: "Therm-a-Rest Hyperion 32",
+    price: 15800,
+    image: "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+    categorySlug: "sacs-de-couchage",
+    description: "Duvet 900FP traité hydrofuge — le sac ultraléger des sommets.",
+    features: ["Duvet 900FP Nikwax", "Confort -7 °C", "Poids : 0,52 kg", "Construction Toe-asis"],
+  },
+  {
+    slug: "gregory-baltoro-65",
+    name: "Sac à dos trek 65 L",
+    brand: "Gregory Baltoro 65",
+    price: 17800,
+    image: "https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=85&fit=crop",
+    categorySlug: "sacs-a-dos",
+    description: "Suspension Response A3 — confort longue distance, accès rapide au volume principal.",
+    features: ["Volume : 65 L", "Suspension Response A3", "Poids : 2,15 kg", "Housse de pluie"],
+  },
+  {
+    slug: "deuter-aircontact-core",
+    name: "Sac à dos trek 60+10 L",
+    brand: "Deuter Aircontact Core 60+10",
+    price: 13900,
+    oldPrice: 16400,
+    image: "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1200&q=85&fit=crop",
+    categorySlug: "sacs-a-dos",
+    description: "Dos Aircontact ventilé — confort durable même chargé. Extension +10 L.",
+    features: ["Volume : 60+10 L", "Dos Aircontact ventilé", "Poids : 2,3 kg", "Ouverture frontale"],
+  },
+  {
+    slug: "osprey-talon-22",
+    name: "Sac à dos journée 22 L",
+    brand: "Osprey Talon 22",
+    price: 7800,
+    image: "https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=85&fit=crop",
+    categorySlug: "sacs-a-dos",
+    description: "Le sac AirScape™ pour la randonnée à la journée — léger, accessible, ventilé.",
+    features: ["Volume : 22 L", "Dos AirScape™", "Poids : 0,75 kg", "Poches stretch latérales"],
+  },
+  {
+    slug: "black-diamond-spot-400",
+    name: "Lampe frontale 400 lm",
+    brand: "Black Diamond Spot 400",
+    price: 5400,
+    image: "https://images.unsplash.com/photo-1471919743851-c4df8b6ee133?w=1200&q=85&fit=crop",
+    categorySlug: "eclairage",
+    description: "400 lumens, gestes PowerTap™ — la frontale polyvalente alpine/trail.",
+    features: ["400 lumens max", "Gestes PowerTap™", "Étanchéité IPX8", "3× AAA / Rechargeable"],
+  },
+  {
+    slug: "biolite-headlamp-425",
+    name: "Frontale rechargeable 425 lm",
+    brand: "BioLite HeadLamp 425",
+    price: 6200,
+    image: "https://images.unsplash.com/photo-1471919743851-c4df8b6ee133?w=1200&q=85&fit=crop",
+    categorySlug: "eclairage",
+    description: "Bandeau Slimfit™ minimaliste, batterie 900 mAh, recharge USB-C.",
+    features: ["425 lumens", "Bandeau Slimfit™", "Recharge USB-C", "Mode rouge sans éblouir"],
+  },
+  {
+    slug: "goal-zero-lighthouse-mini",
+    name: "Lanterne LED 210 lm",
+    brand: "Goal Zero Lighthouse Mini",
+    price: 9800,
+    oldPrice: 11500,
+    image: "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1200&q=85&fit=crop",
+    categorySlug: "eclairage",
+    description: "Lanterne 360° + batterie de secours USB pour recharger un téléphone.",
+    features: ["210 lumens 360°", "Batterie 3000 mAh", "Sortie USB", "Crochet et trépied"],
+  },
+  {
+    slug: "garmin-gpsmap-67",
+    name: "GPS de randonnée",
+    brand: "Garmin GPSMAP 67",
+    price: 45000,
+    image: "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1200&q=85&fit=crop",
+    categorySlug: "navigation",
+    description: "GPS multi-bandes GNSS, écran transflectif lisible au soleil, autonomie 180 h.",
+    features: ["GNSS multi-bandes", "Écran 3″ transflectif", "Autonomie 180 h", "Cartographie TopoActive"],
+  },
+  {
+    slug: "suunto-mc-2",
+    name: "Boussole de visée",
+    brand: "Suunto MC-2",
+    price: 6800,
+    image: "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1200&q=85&fit=crop",
+    categorySlug: "navigation",
+    description: "Boussole miroir avec déclinaison ajustable — la référence des cartographes.",
+    features: ["Aiguille à amortissement liquide", "Miroir de visée", "Déclinaison ajustable", "Clinomètre intégré"],
+  },
+  {
+    slug: "victorinox-camper",
+    name: "Couteau suisse Camper",
+    brand: "Victorinox Camper",
+    price: 4500,
+    oldPrice: 5200,
+    image: "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1200&q=85&fit=crop",
+    categorySlug: "navigation",
+    description: "13 fonctions, scie à bois — le compagnon historique des bivouacs.",
+    features: ["13 fonctions", "Scie à bois", "Acier inoxydable", "Made in Switzerland"],
+  },
+  {
+    slug: "msr-pocketrocket-2",
+    name: "Réchaud à gaz ultraléger",
+    brand: "MSR PocketRocket 2",
+    price: 6900,
+    image: "https://images.unsplash.com/photo-1517824806704-9040b037703b?w=1200&q=85&fit=crop",
+    categorySlug: "campement",
+    description: "73 g — ébullition d'1 L en 3,5 min. Plus compact tu ne trouveras pas.",
+    features: ["Poids : 73 g", "1 L en 3,5 min", "Pliable en bouchon", "Compatible cartouche EN417"],
+  },
+  {
+    slug: "primus-omnilite-ti",
+    name: "Réchaud multi-combustible",
+    brand: "Primus OmniLite Ti",
+    price: 18900,
+    image: "https://images.unsplash.com/photo-1517824806704-9040b037703b?w=1200&q=85&fit=crop",
+    categorySlug: "campement",
+    description: "Gaz, essence, kérosène — le réchaud des expéditions où le combustible se trouve.",
+    features: ["Multi-combustible", "Titane / aluminium", "Pompe ErgoPump™", "Poids : 245 g"],
+  },
+  {
+    slug: "sea-to-summit-x-cup",
+    name: "Tasse silicone pliable",
+    brand: "Sea to Summit X-Cup",
+    price: 1800,
+    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=1200&q=85&fit=crop",
+    categorySlug: "campement",
+    description: "Tasse 250 ml qui se replie à plat. Idéale pour les sacs à dos minimalistes.",
+    features: ["250 ml", "Silicone alimentaire", "Pliable à 11 mm", "Anse rigide"],
+  },
+  {
+    slug: "biolite-campstove-2",
+    name: "Réchaud à bois rechargeur",
+    brand: "BioLite CampStove 2",
+    price: 21500,
+    oldPrice: 24900,
+    image: "https://images.unsplash.com/photo-1517824806704-9040b037703b?w=1200&q=85&fit=crop",
+    categorySlug: "campement",
+    description: "Brûle des brindilles, recharge votre téléphone via USB. Bivouac autonome.",
+    features: ["Combustible : brindilles", "Sortie USB 3 W", "Batterie 2600 mAh", "Poids : 935 g"],
+  },
+  {
+    slug: "nalgene-wide-mouth-1l",
+    name: "Gourde Nalgene 1 L",
+    brand: "Nalgene Wide Mouth",
+    price: 1200,
+    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=1200&q=85&fit=crop",
+    categorySlug: "campement",
+    description: "L'inusable 1 litre — sans BPA, supporte l'eau bouillante, garanti à vie.",
+    features: ["1 L", "Tritan sans BPA", "Goulot large", "Bouchon attaché"],
+  },
+  {
+    slug: "klean-kanteen-32oz",
+    name: "Bouteille isotherme 946 ml",
+    brand: "Klean Kanteen TKWide 32oz",
+    price: 5400,
+    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=1200&q=85&fit=crop",
+    categorySlug: "campement",
+    description: "Inox 18/8 — climatise vos boissons 50 h froides, 24 h chaudes.",
+    features: ["946 ml", "Inox 18/8", "50 h froid · 24 h chaud", "Bouchon en bambou"],
   },
 ];
 

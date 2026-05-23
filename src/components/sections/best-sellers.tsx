@@ -2,7 +2,9 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight, ShoppingBag } from "lucide-react";
 
+import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
+import { PRODUCTS } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
 const discountPercent = (price: number, oldPrice?: number) =>
@@ -16,7 +18,6 @@ const discountPercent = (price: number, oldPrice?: number) =>
 
 const BEST_SELLERS: Array<{
   slug: string;
-  rank: number;
   name: string;
   brand: string;
   price: number;
@@ -25,7 +26,6 @@ const BEST_SELLERS: Array<{
 }> = [
   {
     slug: "marmot-lithium-0",
-    rank: 1,
     name: "Sac de couchage en duvet",
     brand: "Marmot Lithium 0",
     price: 12500,
@@ -34,7 +34,6 @@ const BEST_SELLERS: Array<{
   },
   {
     slug: "msr-hubba-nx",
-    rank: 2,
     name: "Tente 2 places ultralégère",
     brand: "MSR Hubba NX",
     price: 18900,
@@ -42,7 +41,6 @@ const BEST_SELLERS: Array<{
   },
   {
     slug: "osprey-atmos-65",
-    rank: 3,
     name: "Sac à dos de trek 65 L",
     brand: "Osprey Atmos AG",
     price: 14200,
@@ -50,7 +48,6 @@ const BEST_SELLERS: Array<{
   },
   {
     slug: "petzl-actik-core",
-    rank: 4,
     name: "Lampe frontale 450 lm",
     brand: "Petzl Actik Core",
     price: 4800,
@@ -119,7 +116,6 @@ export function BestSellers() {
 /* ───── Product card ───── */
 function ProductCard({
   slug,
-  rank,
   name,
   brand,
   price,
@@ -127,7 +123,6 @@ function ProductCard({
   image,
 }: {
   slug: string;
-  rank: number;
   name: string;
   brand: string;
   price: number;
@@ -135,6 +130,9 @@ function ProductCard({
   image: string;
 }) {
   const pct = discountPercent(price, oldPrice);
+  // Look up the full product (with description, images, etc.) so the
+  // cart icon can push the canonical Product object into the cart.
+  const fullProduct = PRODUCTS.find((p) => p.slug === slug);
   return (
     <TentLink
       href={`/produit/${slug}`}
@@ -154,25 +152,20 @@ function ProductCard({
           className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
         />
 
-        <span
-          aria-label={`Classement numéro ${rank}`}
-          className="absolute start-3 top-3 inline-flex items-center gap-1 rounded-full bg-cream/95 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-tangerine-700 shadow-sm backdrop-blur-sm sm:start-4 sm:top-4"
-        >
-          <span className="size-1.5 rounded-full bg-tangerine-500" />#{rank}
-        </span>
-
         {pct ? (
-          <span className="absolute end-3 top-3 inline-flex items-center rounded-full bg-tangerine-500 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cream shadow-sm sm:end-4 sm:top-4">
+          <span className="absolute start-3 top-3 z-10 inline-flex items-center rounded-full bg-tangerine-500 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cream shadow-sm sm:start-4 sm:top-4">
             -{pct}%
           </span>
         ) : null}
+
+        <ProductActions product={fullProduct} />
       </div>
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
-        <h3 className="font-display text-[14.5px] font-semibold leading-snug text-forest-900 sm:text-base">
+        <h3 className="truncate font-display text-[14.5px] font-semibold leading-snug text-forest-900 sm:text-base">
           {name}
         </h3>
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-wood-600">
+        <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-wood-600">
           {brand}
         </p>
         <div className="mt-3 flex items-baseline gap-2">

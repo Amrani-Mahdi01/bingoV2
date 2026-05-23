@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDown } from "lucide-react";
+import Link from "next/link";
+import { ArrowDown, ArrowRight } from "lucide-react";
+
+import { useLanguage } from "@/lib/i18n";
+import { formatDA, PRODUCTS, type Product } from "@/lib/products";
+import { productHref } from "@/lib/catalogue";
 
 /**
  * BINGO hero — animated tipi camp, BINGO wordmark centered, scroll cue.
@@ -14,25 +19,41 @@ import { ArrowDown } from "lucide-react";
  *     JS after the first paint. Inside each @keyframes block we
  *     explicitly declare `from { hidden }` and use
  *     `animation-fill-mode: backwards`, so the from-state is only
- *     applied during the animation's delay window. If the engine
- *     refuses the animation, the element falls back to its visible
- *     default rather than getting stuck hidden.
- *   - No prefers-reduced-motion override — content stays visible
- *     even with system reduce-motion on, animations just don't play.
+ *     applied during the animation's delay window.
  */
 export function Hero() {
+  const { t } = useLanguage();
   const [mounted, setMounted] = React.useState(false);
 
+  // Default pile order (also what renders on SSR — same on server + first
+  // client paint, so no hydration mismatch). Replaced with a shuffled
+  // selection in the effect below, before the pile animation triggers.
+  const [pilePicks, setPilePicks] = React.useState<{
+    left: Product[];
+    right: Product[];
+  }>(() => ({
+    left: [PRODUCTS[0], PRODUCTS[2], PRODUCTS[4]],
+    right: [PRODUCTS[1], PRODUCTS[5], PRODUCTS[3]],
+  }));
+
   React.useEffect(() => {
-    // Double rAF gets us past hydration + first paint reliably across
-    // browsers that throttle JS during hydration.
     const id1 = window.requestAnimationFrame(() => {
       const id2 = window.requestAnimationFrame(() => setMounted(true));
-      // Stash on the outer ref so cleanup works.
-      // (No nested cleanup needed since both rAFs are short-lived.)
       void id2;
     });
     return () => window.cancelAnimationFrame(id1);
+  }, []);
+
+  // Reshuffle on every mount (Fisher–Yates) so the homepage feels fresh
+  // each visit. Runs before the pile animation kicks in at 2.1s.
+  React.useEffect(() => {
+    const a = [...PRODUCTS];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    const six = a.slice(0, 6);
+    setPilePicks({ left: six.slice(0, 3), right: six.slice(3, 6) });
   }, []);
 
   const letters = "BINGO".split("");
@@ -40,35 +61,34 @@ export function Hero() {
   return (
     <section
       aria-labelledby="hero-title"
-      className={`relative isolate flex flex-col overflow-hidden bg-gradient-to-b from-cream via-wood-100/40 to-wood-200/60 ${
-        mounted ? "hero-mounted" : ""
-      }`}
-      style={{ minHeight: "calc(100vh - 104px)" }}
+      className={[
+        "relative isolate flex flex-col overflow-hidden bg-linear-to-b from-cream via-wood-100/40 to-wood-200/60",
+        "min-h-[calc(100svh_-_125px)] sm:min-h-[calc(100svh_-_137px)] lg:min-h-[calc(100svh_-_72px)]",
+        mounted ? "hero-mounted" : "",
+      ].join(" ")}
     >
       <style>{`
         /* ──────────── TIPI ASSEMBLY ──────────── */
-        /* Default = fully drawn (dashoffset 0). Animation provides the
-           draw-in effect via @keyframes from { dashoffset: 100; }. */
         .tipi-line { stroke-dasharray: 100; }
 
-        .hero-mounted .tipi-ground       { animation: tipi-draw 600ms cubic-bezier(0.4,0,0.2,1) 200ms backwards; }
-        .hero-mounted .tipi-pole-left    { animation: tipi-draw 650ms cubic-bezier(0.34,1.25,0.64,1) 650ms backwards; }
-        .hero-mounted .tipi-pole-right   { animation: tipi-draw 650ms cubic-bezier(0.34,1.25,0.64,1) 780ms backwards; }
-        .hero-mounted .tipi-fabric-stroke{ animation: tipi-draw 900ms cubic-bezier(0.4,0,0.2,1) 1100ms backwards; }
+        .hero-mounted .tipi-ground       { animation: tipi-draw 270ms cubic-bezier(0.4,0,0.2,1) 80ms backwards; }
+        .hero-mounted .tipi-pole-left    { animation: tipi-draw 290ms cubic-bezier(0.34,1.25,0.64,1) 270ms backwards; }
+        .hero-mounted .tipi-pole-right   { animation: tipi-draw 290ms cubic-bezier(0.34,1.25,0.64,1) 330ms backwards; }
+        .hero-mounted .tipi-fabric-stroke{ animation: tipi-draw 415ms cubic-bezier(0.4,0,0.2,1) 460ms backwards; }
         @keyframes tipi-draw {
           from { stroke-dashoffset: 100; }
           to   { stroke-dashoffset: 0;   }
         }
 
-        .hero-mounted .tipi-fabric-fill  { animation: tipi-fade-in 800ms ease-out 1500ms backwards; }
-        .hero-mounted .tipi-detail       { animation: tipi-fade-in 500ms ease-out 1950ms backwards; }
+        .hero-mounted .tipi-fabric-fill  { animation: tipi-fade-in 370ms ease-out 640ms backwards; }
+        .hero-mounted .tipi-detail       { animation: tipi-fade-in 225ms ease-out 840ms backwards; }
         @keyframes tipi-fade-in {
           from { opacity: 0; }
           to   { opacity: 1; }
         }
 
-        .hero-mounted .tipi-stake-left   { animation: tipi-stake-in 380ms cubic-bezier(0.34,1.6,0.64,1) 2150ms backwards; }
-        .hero-mounted .tipi-stake-right  { animation: tipi-stake-in 380ms cubic-bezier(0.34,1.6,0.64,1) 2280ms backwards; }
+        .hero-mounted .tipi-stake-left   { animation: tipi-stake-in 175ms cubic-bezier(0.34,1.6,0.64,1) 945ms backwards; }
+        .hero-mounted .tipi-stake-right  { animation: tipi-stake-in 175ms cubic-bezier(0.34,1.6,0.64,1) 1000ms backwards; }
         @keyframes tipi-stake-in {
           from { opacity: 0; transform: translateY(-5px); }
           to   { opacity: 1; transform: translateY(0);    }
@@ -77,8 +97,8 @@ export function Hero() {
         .tipi-flag { transform-origin: 300px 55px; }
         .hero-mounted .tipi-flag {
           animation:
-            tipi-flag-pop  500ms cubic-bezier(0.34,1.8,0.64,1) 2350ms backwards,
-            tipi-flag-wave 3.8s ease-in-out 3000ms infinite;
+            tipi-flag-pop  230ms cubic-bezier(0.34,1.8,0.64,1) 1030ms backwards,
+            tipi-flag-wave 3.8s ease-in-out 1320ms infinite;
         }
         @keyframes tipi-flag-pop  {
           from { opacity: 0; transform: scale(0) rotate(-18deg); }
@@ -93,8 +113,8 @@ export function Hero() {
         .tipi-fire { transform-origin: 360px 408px; }
         .hero-mounted .tipi-fire {
           animation:
-            tipi-fire-ignite  650ms ease-out 2500ms backwards,
-            tipi-fire-flicker 380ms ease-in-out 3200ms infinite;
+            tipi-fire-ignite  305ms ease-out 1095ms backwards,
+            tipi-fire-flicker 380ms ease-in-out 1400ms infinite;
         }
         @keyframes tipi-fire-ignite {
           0%   { opacity: 0; transform: scale(0); }
@@ -109,9 +129,9 @@ export function Hero() {
         }
 
         .hero-mounted .tipi-ember { animation: tipi-ember-rise 2.6s ease-out infinite; }
-        .hero-mounted .tipi-ember-1 { animation-delay: 3.0s; }
-        .hero-mounted .tipi-ember-2 { animation-delay: 3.9s; }
-        .hero-mounted .tipi-ember-3 { animation-delay: 4.8s; }
+        .hero-mounted .tipi-ember-1 { animation-delay: 1.32s; }
+        .hero-mounted .tipi-ember-2 { animation-delay: 1.72s; }
+        .hero-mounted .tipi-ember-3 { animation-delay: 2.12s; }
         @keyframes tipi-ember-rise {
           0%   { opacity: 0;   transform: translate(0,0); }
           15%  { opacity: 0.95; }
@@ -120,9 +140,9 @@ export function Hero() {
         }
 
         .hero-mounted .tipi-smoke { animation: tipi-smoke-rise 4.4s ease-out infinite; }
-        .hero-mounted .tipi-smoke-1 { animation-delay: 2.6s; }
-        .hero-mounted .tipi-smoke-2 { animation-delay: 4.1s; }
-        .hero-mounted .tipi-smoke-3 { animation-delay: 5.5s; }
+        .hero-mounted .tipi-smoke-1 { animation-delay: 1.12s; }
+        .hero-mounted .tipi-smoke-2 { animation-delay: 1.84s; }
+        .hero-mounted .tipi-smoke-3 { animation-delay: 2.40s; }
         @keyframes tipi-smoke-rise {
           0%   { opacity: 0;    transform: translate(0,0)         scale(0.5); }
           20%  { opacity: 0.55; }
@@ -131,14 +151,11 @@ export function Hero() {
         }
 
         /* ──────────── SCENE BLUR + IDLE DRIFT ──────────── */
-        /* Default = blurred. JS-triggered animation transitions from
-           sharp to blur. So even on browsers that ignore animations,
-           the tipi is blurred (which is the intended final state). */
         .tipi-scene { filter: blur(7px); opacity: 0.4; transform: scale(1.06); transform-origin: center; will-change: filter, opacity, transform; }
         .hero-mounted .tipi-scene {
           animation:
-            tipi-scene-blur  1200ms cubic-bezier(0.4,0,0.2,1) 3000ms backwards,
-            tipi-scene-drift 16s    ease-in-out                4400ms infinite;
+            tipi-scene-blur  560ms cubic-bezier(0.4,0,0.2,1) 1320ms backwards,
+            tipi-scene-drift 16s   ease-in-out               1920ms infinite;
         }
         @keyframes tipi-scene-blur {
           from { filter: blur(0);    opacity: 1;   transform: scale(1);    }
@@ -150,11 +167,10 @@ export function Hero() {
         }
 
         /* ──────────── BINGO WORDMARK ──────────── */
-        /* Default = visible. Animations gated behind .hero-mounted. */
         .hero-bingo-letter { display: inline-block; will-change: transform, opacity; }
         .hero-mounted .hero-bingo-letter {
           animation:
-            hero-bingo-enter 750ms cubic-bezier(0.16,1,0.3,1) backwards,
+            hero-bingo-enter 360ms cubic-bezier(0.16,1,0.3,1) backwards,
             hero-bingo-wave  2.8s  ease-in-out                infinite;
         }
         @keyframes hero-bingo-enter {
@@ -169,7 +185,7 @@ export function Hero() {
         .hero-bingo-dot { display: inline-block; transform-origin: center; will-change: transform, opacity; }
         .hero-mounted .hero-bingo-dot {
           animation:
-            hero-dot-pop   500ms cubic-bezier(0.34,1.8,0.64,1) backwards,
+            hero-dot-pop   240ms cubic-bezier(0.34,1.8,0.64,1) backwards,
             hero-dot-pulse 2.8s  ease-in-out                   infinite;
         }
         @keyframes hero-dot-pop   {
@@ -179,23 +195,58 @@ export function Hero() {
         @keyframes hero-dot-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.22); } }
 
         .hero-rule { transform-origin: center; }
-        .hero-mounted .hero-rule { animation: hero-rule-in 700ms cubic-bezier(0.16,1,0.3,1) 4400ms backwards; }
+        .hero-mounted .hero-rule { animation: hero-rule-in 320ms cubic-bezier(0.16,1,0.3,1) 1920ms backwards; }
         @keyframes hero-rule-in {
           from { opacity: 0; transform: scaleX(0); }
           to   { opacity: 1; transform: scaleX(1); }
         }
 
-        .hero-mounted .hero-tagline { animation: hero-tagline-in 700ms ease-out 4500ms backwards; }
+        .hero-mounted .hero-tagline { animation: hero-tagline-in 320ms ease-out 1980ms backwards; }
         @keyframes hero-tagline-in {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0);    }
         }
 
+        /* ──────────── IMAGE PILES — one image at a time
+              Each thumb slides in from its respective edge with its own
+              animation-delay (passed inline via style). The rotation is
+              held in a --rot CSS variable so the keyframe can sweep
+              from translateX(+/-220%) rotate(0) -> translateX(0) rotate(var(--rot)). */
+        .hero-pile-img {
+          will-change: transform, opacity;
+          transform: rotate(var(--rot, 0deg));
+        }
+        .hero-mounted .hero-pile-img-left {
+          animation: hero-pile-img-left-in 600ms cubic-bezier(0.34,1.25,0.64,1) backwards;
+        }
+        .hero-mounted .hero-pile-img-right {
+          animation: hero-pile-img-right-in 600ms cubic-bezier(0.34,1.25,0.64,1) backwards;
+        }
+        @keyframes hero-pile-img-left-in {
+          from { opacity: 0; transform: translateX(-220%) rotate(0deg); }
+          to   { opacity: 1; transform: translateX(0)     rotate(var(--rot, 0deg)); }
+        }
+        @keyframes hero-pile-img-right-in {
+          from { opacity: 0; transform: translateX(220%) rotate(0deg); }
+          to   { opacity: 1; transform: translateX(0)    rotate(var(--rot, 0deg)); }
+        }
+
+        /* ──────────── PROMO BLOCK — eyebrow + slogan + CTA.
+              Opens after the piles have all landed. */
+        .hero-promo { will-change: opacity, transform; }
+        .hero-mounted .hero-promo {
+          animation: hero-promo-reveal 480ms ease-out 3100ms backwards;
+        }
+        @keyframes hero-promo-reveal {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+
         /* ──────────── SCROLL INDICATOR ──────────── */
-        .hero-mounted .hero-scroll { animation: hero-tagline-in 700ms ease-out 4900ms backwards; }
+        .hero-mounted .hero-scroll { animation: hero-tagline-in 320ms ease-out 3500ms backwards; }
         .hero-scroll-arrow { will-change: transform; }
         .hero-mounted .hero-scroll-arrow {
-          animation: hero-scroll-bounce 1.8s cubic-bezier(0.5,0,0.5,1) 5600ms infinite;
+          animation: hero-scroll-bounce 1.8s cubic-bezier(0.5,0,0.5,1) 3900ms infinite;
         }
         @keyframes hero-scroll-bounce {
           0%, 100% { transform: translateY(0);   opacity: 1;   }
@@ -209,7 +260,7 @@ export function Hero() {
           aria-hidden
           viewBox="0 0 600 480"
           preserveAspectRatio="xMidYMax meet"
-          className="h-[72%] w-auto max-h-[560px] max-w-[80%]"
+          className="h-[70%] w-auto max-h-[360px] max-w-[70%]"
         >
           <line pathLength={100} className="tipi-line tipi-ground" x1="100" y1="400" x2="500" y2="400" stroke="#5b452a" strokeWidth="2.5" strokeLinecap="round" fill="none" />
           <line pathLength={100} className="tipi-line tipi-pole-left"  x1="200" y1="400" x2="280" y2="34" stroke="#3d341f" strokeWidth="3" strokeLinecap="round" fill="none" />
@@ -262,18 +313,19 @@ export function Hero() {
         </svg>
       </div>
 
-      {/* BINGO wordmark — centered */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 text-center">
+      {/* BINGO wordmark — centered, biased upward via padding-bottom so
+          the image piles + promo block sit comfortably below */}
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-[8vh] text-center sm:pb-[10vh]">
         <h1
           id="hero-title"
-          className="font-display font-bold leading-[0.86] tracking-[-0.05em] text-forest-900 text-[88px] sm:text-[136px] md:text-[184px] lg:text-[224px]"
+          className="font-display font-bold leading-[0.86] tracking-[-0.05em] text-forest-900 text-[80px] sm:text-[112px] md:text-[148px] lg:text-[180px]"
         >
           {letters.map((char, i) => (
             <span
               key={i}
               aria-hidden={i > 0}
               className="hero-bingo-letter"
-              style={{ animationDelay: `${3400 + i * 90}ms, ${4150 + i * 160}ms` }}
+              style={{ animationDelay: `${1500 + i * 50}ms, ${1820 + i * 100}ms` }}
             >
               {char}
             </span>
@@ -281,20 +333,61 @@ export function Hero() {
           <span
             aria-hidden
             className="hero-bingo-dot ms-1 text-tangerine-500"
-            style={{ animationDelay: "3900ms, 4400ms" }}
+            style={{ animationDelay: "1710ms, 1935ms" }}
           >
             .
           </span>
           <span className="sr-only">BINGO</span>
         </h1>
 
-        <div aria-hidden className="hero-rule mt-5 h-px w-20 bg-wood-700/40 sm:mt-7 sm:w-24" />
+        <div aria-hidden className="hero-rule mt-4 h-px w-16 bg-wood-700/40 sm:mt-5 sm:w-20" />
 
-        <p className="hero-tagline mt-4 max-w-md font-display text-[11px] font-semibold uppercase tracking-[0.24em] text-tangerine-700 sm:mt-5 sm:text-sm">
+        <p className="hero-tagline mt-3 max-w-md font-display text-[10px] font-semibold uppercase tracking-[0.24em] text-tangerine-700 sm:mt-4 sm:text-xs">
           Le matériel d&apos;aventure, côte à côte.
         </p>
 
-        <div className="hero-scroll mt-10 flex items-center gap-2 sm:mt-12" aria-hidden>
+        {/* Image piles — each thumb slides in one-by-one, alternating
+            between left and right (left fires 100ms before right). */}
+        <div className="mt-28 flex items-center justify-center gap-7 sm:mt-28 sm:gap-14">
+          <HeroPile
+            side="left"
+            products={pilePicks.left}
+            baseDelay={2100}
+            stagger={220}
+          />
+          <HeroPile
+            side="right"
+            products={pilePicks.right}
+            baseDelay={2200}
+            stagger={220}
+          />
+        </div>
+
+        {/* Promo block — eyebrow + slogan + CTA. */}
+        <div className="hero-promo mt-20 flex flex-col items-center gap-3 sm:mt-20 sm:gap-3.5">
+          <p className="font-mono text-[10px] uppercase tracking-[0.26em] text-tangerine-700">
+            {t("hero.promo.eyebrow")}
+          </p>
+          <p className="max-w-md font-display text-base font-semibold leading-[1.2] tracking-[-0.01em] text-forest-900 sm:text-lg md:text-xl">
+            {t("hero.promo.slogan")}
+          </p>
+          <Link
+            href="/catalogue?promo=1"
+            className={[
+              "mt-1 inline-flex items-center gap-1.5 rounded-full bg-tangerine-500 px-5 py-2",
+              "font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-cream",
+              "shadow-[0_10px_28px_-10px_rgba(234,108,29,0.55)]",
+              "transition-all duration-300 hover:bg-tangerine-600 hover:scale-[1.03]",
+              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40",
+              "sm:px-6 sm:py-2.5 sm:text-[12px]",
+            ].join(" ")}
+          >
+            {t("hero.promo.cta")}
+            <ArrowRight className="size-3.5 rtl:rotate-180" strokeWidth={2.2} />
+          </Link>
+        </div>
+
+        <div className="hero-scroll mt-8 flex items-center gap-2 sm:mt-10" aria-hidden>
           <span className="font-mono text-[9.5px] uppercase tracking-[0.32em] text-wood-700/70">
             Défiler
           </span>
@@ -307,3 +400,71 @@ export function Hero() {
     </section>
   );
 }
+
+/* ─── Hero image pile — fan of 3 product thumbs, rotated and slightly
+       overlapped. Each thumb animates in individually, back-to-front,
+       via its own animation-delay so the stack assembles one by one. ── */
+function HeroPile({
+  side,
+  products,
+  baseDelay = 2100,
+  stagger = 220,
+}: {
+  side: "left" | "right";
+  products: Product[];
+  baseDelay?: number;
+  stagger?: number;
+}) {
+  const isLeft = side === "left";
+  return (
+    <div className="relative flex shrink-0">
+      {products.map((p, i) => {
+        // Rotation: deepest at the back, near-flat at the front.
+        // Left pile rotates negative, right pile positive.
+        const angle = (isLeft ? -1 : 1) * (10 - i * 4);
+        // Back of the pile (largest i) appears first; front lands last.
+        const order = products.length - 1 - i;
+        const delay = baseDelay + order * stagger;
+        return (
+          <Link
+            key={p.slug}
+            href={productHref(p.slug)}
+            aria-label={p.name}
+            className={[
+              "hero-pile-img",
+              isLeft ? "hero-pile-img-left" : "hero-pile-img-right",
+              "relative size-32 shrink-0 overflow-hidden rounded-xl ring-2 ring-cream shadow-[0_14px_30px_-8px_rgba(31,58,30,0.45)] sm:size-36 md:size-40",
+              "transition-shadow duration-300 hover:shadow-[0_18px_36px_-10px_rgba(31,58,30,0.55)]",
+              "focus-visible:outline-none focus-visible:ring-tangerine-400",
+            ].join(" ")}
+            style={{
+              marginLeft: i === 0 ? 0 : -50,
+              zIndex: products.length - i,
+              "--rot": `${angle}deg`,
+              animationDelay: `${delay}ms`,
+            } as React.CSSProperties}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={p.image}
+              alt=""
+              aria-hidden
+              loading="lazy"
+              className="absolute inset-0 size-full object-cover"
+            />
+            {/* Bottom scrim so the price stays legible */}
+            <div
+              aria-hidden
+              className="absolute inset-x-0 bottom-0 h-14 bg-linear-to-t from-forest-900/85 via-forest-900/40 to-transparent"
+            />
+            {/* Price pill */}
+            <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-forest-900/90 px-2 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-cream backdrop-blur sm:text-[10.5px]">
+              {formatDA(p.price)}
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
