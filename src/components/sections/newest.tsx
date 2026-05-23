@@ -178,7 +178,7 @@ function ProductCard({
     <TentLink
       href={`/produit/${slug}`}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border border-cream/10 bg-forest-900/60 backdrop-blur-sm",
+        "group relative flex h-full flex-col overflow-hidden rounded-xl border border-cream/10 bg-forest-900/60 backdrop-blur-sm",
         "transition-all duration-300 hover:-translate-y-0.5 hover:border-tangerine-400/60 hover:bg-forest-800/80 hover:shadow-[0_14px_32px_-14px_rgba(0,0,0,0.55)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-400"
       )}
@@ -221,21 +221,23 @@ function ProductCard({
         <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-cream/65">
           {brand}
         </p>
-        <div className="mt-3 flex items-baseline gap-2">
+        <div className="mt-3 flex flex-col leading-tight">
           <span className="font-display text-lg font-bold tracking-tight text-tangerine-300 sm:text-xl">
             {formatPrice(price)}
           </span>
           {oldPrice ? (
-            <span className="font-mono text-[11px] text-cream/45 line-through">
+            <span className="mt-0.5 block font-mono text-[11px] text-cream/45 line-through">
               {formatPrice(oldPrice)}
             </span>
           ) : null}
         </div>
 
-        <span className="mt-3 inline-flex items-center justify-center gap-2 rounded-full bg-tangerine-500 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cream transition-colors duration-300 group-hover:bg-tangerine-400 group-hover:text-forest-900 sm:mt-4 sm:py-2.5">
-          <ShoppingBag className="size-3" strokeWidth={2.2} />
-          Commander
-        </span>
+        <div className="mt-auto pt-3 sm:pt-4">
+          <span className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-tangerine-500 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cream transition-colors duration-300 group-hover:bg-tangerine-400 group-hover:text-forest-900 sm:py-2.5">
+            <ShoppingBag className="size-3" strokeWidth={2.2} />
+            Commander
+          </span>
+        </div>
       </div>
     </TentLink>
   );

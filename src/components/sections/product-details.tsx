@@ -100,12 +100,12 @@ export function ProductDetails({ product }: { product: Product }) {
               {product.name}
             </h1>
 
-            <div className="mt-6 flex items-baseline gap-3">
+            <div className="mt-6 flex flex-col leading-tight">
               <span className="font-display text-3xl font-bold tracking-tight text-tangerine-700 md:text-4xl">
                 {formatDA(product.price)}
               </span>
               {product.oldPrice ? (
-                <span className="font-mono text-sm text-wood-500 line-through">
+                <span className="mt-1 font-mono text-sm text-wood-500 line-through">
                   {formatDA(product.oldPrice)}
                 </span>
               ) : null}
@@ -442,7 +442,7 @@ function SimilarProductCard({ product }: { product: Product }) {
     <TentLink
       href={productHref(product.slug)}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border border-wood-300/50 bg-cream",
+        "group relative flex h-full flex-col overflow-hidden rounded-xl border border-wood-300/50 bg-cream",
         "transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-14px_rgba(31,58,30,0.22)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
       )}
@@ -473,22 +473,24 @@ function SimilarProductCard({ product }: { product: Product }) {
         <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-wood-600">
           {product.brand}
         </p>
-        <div className="mt-3 flex items-baseline gap-2">
+        <div className="mt-3 flex flex-col leading-tight">
           <span className="font-display text-lg font-bold tracking-tight text-tangerine-700 sm:text-xl">
             {formatDA(product.price)}
           </span>
           {product.oldPrice ? (
-            <span className="font-mono text-[11px] text-wood-500 line-through">
+            <span className="mt-0.5 block font-mono text-[11px] text-wood-500 line-through">
               {formatDA(product.oldPrice)}
             </span>
           ) : null}
         </div>
 
-        {/* Commander pill — sits at the bottom of the card */}
-        <span className="mt-3 inline-flex items-center justify-center gap-2 rounded-full bg-forest-900 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cream transition-colors duration-300 group-hover:bg-tangerine-500 sm:mt-4 sm:py-2.5">
-          <ShoppingBag className="size-3" strokeWidth={2.2} />
-          Commander
-        </span>
+        {/* Commander pill — anchored to the bottom */}
+        <div className="mt-auto pt-3 sm:pt-4">
+          <span className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-forest-900 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cream transition-colors duration-300 group-hover:bg-tangerine-500 sm:py-2.5">
+            <ShoppingBag className="size-3" strokeWidth={2.2} />
+            Commander
+          </span>
+        </div>
       </div>
     </TentLink>
   );
