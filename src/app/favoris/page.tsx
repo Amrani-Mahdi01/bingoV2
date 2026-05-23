@@ -146,15 +146,12 @@ function FavoriteCard({ product }: { product: Product }) {
           ) : null}
         </div>
 
-        <div className="mt-auto flex gap-2 pt-3 sm:flex-col sm:pt-4">
-          <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-forest-900 px-2.5 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:flex-none sm:w-full sm:gap-2 sm:px-3 sm:py-2.5 sm:text-[10px] sm:tracking-[0.2em]">
+        <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
+          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
             Commander
           </span>
-          <AddToCartButton
-            product={product}
-            className="flex-1 sm:w-full sm:flex-none"
-          />
+          <AddToCartButton product={product} />
         </div>
       </div>
     </TentLink>
