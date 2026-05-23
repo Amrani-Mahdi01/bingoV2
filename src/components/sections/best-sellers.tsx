@@ -2,6 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight, ShoppingBag } from "lucide-react";
 
+import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
 import { PRODUCTS } from "@/lib/products";
@@ -179,13 +180,18 @@ function ProductCard({
           ) : null}
         </div>
 
-        {/* Commander pill — anchored to the bottom so every card in a
-            row finishes at the same point regardless of name length. */}
-        <div className="mt-auto pt-3 sm:pt-4">
-          <span className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-forest-900 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cream transition-colors duration-300 group-hover:bg-tangerine-500 sm:py-2.5">
+        {/* Bottom CTAs — Commander pill (navigates via the card link)
+            stacked above the labeled add-to-cart button. mt-auto
+            keeps every card's bottom edge aligned. */}
+        <div className="mt-auto flex gap-2 pt-3 sm:flex-col sm:pt-4">
+          <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-forest-900 px-2.5 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:flex-none sm:w-full sm:gap-2 sm:px-3 sm:py-2.5 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
             Commander
           </span>
+          <AddToCartButton
+            product={fullProduct}
+            className="flex-1 sm:w-full sm:flex-none"
+          />
         </div>
       </div>
     </TentLink>

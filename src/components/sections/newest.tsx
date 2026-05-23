@@ -1,6 +1,7 @@
 import * as React from "react";
 import { ShoppingBag } from "lucide-react";
 
+import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
 import { PRODUCTS } from "@/lib/products";
@@ -232,11 +233,15 @@ function ProductCard({
           ) : null}
         </div>
 
-        <div className="mt-auto pt-3 sm:pt-4">
-          <span className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-tangerine-500 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cream transition-colors duration-300 group-hover:bg-tangerine-400 group-hover:text-forest-900 sm:py-2.5">
+        <div className="mt-auto flex gap-2 pt-3 sm:flex-col sm:pt-4">
+          <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-tangerine-500 px-2.5 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-400 hover:text-forest-900 sm:flex-none sm:w-full sm:gap-2 sm:px-3 sm:py-2.5 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
             Commander
           </span>
+          <AddToCartButton
+            product={fullProduct}
+            className="flex-1 border-cream/30 bg-transparent text-cream hover:bg-cream hover:text-forest-900 sm:w-full sm:flex-none"
+          />
         </div>
       </div>
     </TentLink>
