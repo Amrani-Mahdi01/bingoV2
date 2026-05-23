@@ -323,29 +323,38 @@ export default function CheckoutPage() {
             ) : (
               <ul className="mt-5 divide-y divide-wood-300/40">
                 {items.map(({ product, qty }) => (
-                  <li key={product.slug} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+                  <li
+                    key={product.slug}
+                    className="flex gap-2.5 py-3 first:pt-0 last:pb-0 sm:gap-3"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={product.image}
                       alt=""
                       aria-hidden
                       loading="lazy"
-                      className="size-14 shrink-0 rounded-md object-cover ring-1 ring-wood-300/60"
+                      className="size-12 shrink-0 rounded-md object-cover ring-1 ring-wood-300/60 sm:size-14"
                     />
-                    <div className="flex min-w-0 flex-1 flex-col leading-tight">
-                      <p className="truncate font-display text-[13px] font-semibold text-forest-900">
-                        {product.name}
-                      </p>
-                      <p className="truncate font-mono text-[10px] uppercase tracking-[0.16em] text-wood-600">
-                        {product.brand}
-                      </p>
-                      <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-wood-700">
-                        Quantité : {qty}
-                      </p>
+                    {/* Body — stacks vertically on narrow widths so the
+                        price drops below the text instead of squeezing
+                        the title. Flips to a row on sm+ with the price
+                        anchored to the right. */}
+                    <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
+                      <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                        <p className="truncate font-display text-[12px] font-semibold text-forest-900 sm:text-[13px]">
+                          {product.name}
+                        </p>
+                        <p className="truncate font-mono text-[9.5px] uppercase tracking-[0.14em] text-wood-600 sm:text-[10px] sm:tracking-[0.16em]">
+                          {product.brand}
+                        </p>
+                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-wood-700 sm:text-[10.5px]">
+                          Quantité : {qty}
+                        </p>
+                      </div>
+                      <span className="whitespace-nowrap font-display text-[13px] font-semibold text-forest-900 sm:shrink-0 sm:self-start">
+                        {formatDA(product.price * qty)}
+                      </span>
                     </div>
-                    <span className="shrink-0 self-start font-display text-[13px] font-semibold text-forest-900">
-                      {formatDA(product.price * qty)}
-                    </span>
                   </li>
                 ))}
               </ul>
