@@ -52,12 +52,18 @@ export function Categories() {
           title="Trouvez le matériel par catégorie"
           subtitle="Sacs de couchage, tentes, sacs à dos et plus encore — testés sur le terrain, comparés côte à côte."
           ctaLabel="Voir tout"
-          ctaHref="/materiel"
+          ctaHref="/catalogue"
         />
 
         <ul className="mt-10 grid grid-cols-3 gap-4 sm:gap-5 md:mt-12 md:grid-cols-6 md:gap-5 lg:grid-cols-8">
-          {CATEGORIES.map((c) => (
-            <li key={c.slug}>
+          {CATEGORIES.slice(0, 9).map((c, i) => (
+            <li
+              key={c.slug}
+              // 9 tiles total on mobile/tablet (3×3 / 6+3), but on
+              // lg+ the grid is 8 cols wide so the 9th tile is
+              // hidden to keep a clean single row.
+              className={i === 8 ? "lg:hidden" : undefined}
+            >
               <CategoryCard {...c} />
             </li>
           ))}
@@ -124,7 +130,7 @@ function CategoryCard({
 }: Category) {
   return (
     <TentLink
-      href={`/categorie/${slug}`}
+      href={`/catalogue?category=${slug}`}
       className={cn(
         "group flex flex-col items-center gap-2.5 text-center",
         "focus-visible:outline-none"

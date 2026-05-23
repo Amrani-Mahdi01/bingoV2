@@ -59,14 +59,21 @@ export default function CataloguePage() {
   );
 }
 
+const SORT_VALUES = SORTS.map((s) => s.value) as readonly string[];
+function readSort(raw: string | null): SortValue | null {
+  return raw && SORT_VALUES.includes(raw) ? (raw as SortValue) : null;
+}
+
 function CatalogueContent() {
   const searchParams = useSearchParams();
   // Read filter intent from the URL (e.g. ?promo=1 from the
-  // header "Promotions" link, ?category=tentes from a category tile).
+  // header "Promotions" link, ?category=tentes from a category tile,
+  // ?sort=popular from the best-sellers "Voir le classement" CTA).
   const initialPromosOnly =
     searchParams.get("promo") === "1" ||
     searchParams.get("promo") === "true";
   const initialCategory = searchParams.get("category");
+  const initialSort = readSort(searchParams.get("sort"));
 
   const [activeCategory, setActiveCategory] = React.useState<string | null>(
     initialCategory && CATEGORIES.some((c) => c.slug === initialCategory)
@@ -79,7 +86,7 @@ function CatalogueContent() {
   const [expandedCategories, setExpandedCategories] = React.useState<
     Set<string>
   >(() => new Set());
-  const [sort, setSort] = React.useState<SortValue>("popular");
+  const [sort, setSort] = React.useState<SortValue>(initialSort ?? "popular");
   const [promosOnly, setPromosOnly] = React.useState(initialPromosOnly);
   const [inStockOnly, setInStockOnly] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -214,6 +221,8 @@ function CatalogueContent() {
       setActiveCategory(c);
       setActiveSubCategory(null);
     }
+    const s = readSort(searchParams.get("sort"));
+    if (s) setSort(s);
   }, [searchParams]);
 
   // Reset to page 1 whenever the filter set changes so the user doesn't

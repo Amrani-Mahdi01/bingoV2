@@ -126,7 +126,7 @@ export function Newest() {
       ))}
 
       <div className="relative z-10 mx-auto w-full max-w-7xl px-6 md:px-10">
-        <header className="flex flex-col gap-5 md:items-end md:text-end">
+        <header className="flex flex-col gap-5">
           <div className="max-w-2xl">
             <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-tangerine-300">
               Nouveautés · Cette semaine

@@ -89,7 +89,7 @@ export function BestSellers() {
             </p>
           </div>
           <Link
-            href="/best-sellers"
+            href="/catalogue?sort=popular"
             className="group inline-flex items-center gap-1.5 self-start font-display text-sm font-medium text-forest-900 underline-offset-4 transition-colors hover:text-tangerine-700 hover:underline md:self-end"
           >
             Voir le classement complet
