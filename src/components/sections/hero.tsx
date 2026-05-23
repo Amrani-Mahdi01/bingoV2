@@ -349,7 +349,7 @@ export function Hero() {
 
         {/* Image piles — each thumb slides in one-by-one, alternating
             between left and right (left fires 100ms before right). */}
-        <div className="mt-28 flex items-center justify-center gap-7 sm:mt-28 sm:gap-14">
+        <div className="mt-10 flex items-center justify-center gap-7 sm:mt-28 sm:gap-14">
           <HeroPile
             side="left"
             products={pilePicks.left}
