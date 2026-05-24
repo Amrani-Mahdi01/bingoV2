@@ -1,8 +1,11 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
 import { TentLink } from "@/components/ui/tent-link";
+import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,33 +17,35 @@ import { cn } from "@/lib/utils";
  * until dedicated artwork is available.
  */
 
+/** Names live in i18n under `category.{slug}`; we only carry the slug
+ *  + icon + count here. */
 type Category = {
   slug: string;
-  name: string;
   productCount: number;
   icon: string;
 };
 
 const CATEGORIES: Category[] = [
-  { slug: "tentes",            name: "Tentes",            productCount: 18, icon: "/categories/camping-tent.png" },
-  { slug: "sacs-a-dos",        name: "Sacs à dos",        productCount: 32, icon: "/categories/backpack.png" },
-  { slug: "chaussures",        name: "Chaussures",        productCount: 24, icon: "/categories/boots.png" },
-  { slug: "eclairage",         name: "Éclairage",         productCount: 15, icon: "/categories/flashlight.png" },
-  { slug: "navigation",        name: "Navigation",        productCount: 11, icon: "/categories/map.png" },
-  { slug: "campement",         name: "Campement",         productCount: 28, icon: "/categories/bonfire.png" },
-  { slug: "sacs-de-couchage",  name: "Sacs de couchage",  productCount: 14, icon: "/categories/camping-tent.png" },
-  { slug: "cuisine",           name: "Cuisine de camp",   productCount: 19, icon: "/categories/bonfire.png" },
-  { slug: "hydratation",       name: "Hydratation",       productCount: 12, icon: "/categories/map.png" },
-  { slug: "vetements",         name: "Vêtements",         productCount: 22, icon: "/categories/backpack.png" },
-  { slug: "rechauds",          name: "Réchauds",          productCount: 9,  icon: "/categories/bonfire.png" },
-  { slug: "couteaux",          name: "Couteaux & outils", productCount: 17, icon: "/categories/map.png" },
-  { slug: "accessoires",       name: "Accessoires",       productCount: 25, icon: "/categories/boots.png" },
-  { slug: "sacs-etanches",     name: "Sacs étanches",     productCount: 8,  icon: "/categories/backpack.png" },
-  { slug: "tapis-matelas",     name: "Tapis & matelas",   productCount: 13, icon: "/categories/camping-tent.png" },
-  { slug: "securite",          name: "Sécurité",          productCount: 7,  icon: "/categories/flashlight.png" },
+  { slug: "tentes",            productCount: 18, icon: "/categories/camping-tent.png" },
+  { slug: "sacs-a-dos",        productCount: 32, icon: "/categories/backpack.png" },
+  { slug: "chaussures",        productCount: 24, icon: "/categories/boots.png" },
+  { slug: "eclairage",         productCount: 15, icon: "/categories/flashlight.png" },
+  { slug: "navigation",        productCount: 11, icon: "/categories/map.png" },
+  { slug: "campement",         productCount: 28, icon: "/categories/bonfire.png" },
+  { slug: "sacs-de-couchage",  productCount: 14, icon: "/categories/camping-tent.png" },
+  { slug: "cuisine",           productCount: 19, icon: "/categories/bonfire.png" },
+  { slug: "hydratation",       productCount: 12, icon: "/categories/map.png" },
+  { slug: "vetements",         productCount: 22, icon: "/categories/backpack.png" },
+  { slug: "rechauds",          productCount: 9,  icon: "/categories/bonfire.png" },
+  { slug: "couteaux",          productCount: 17, icon: "/categories/map.png" },
+  { slug: "accessoires",       productCount: 25, icon: "/categories/boots.png" },
+  { slug: "sacs-etanches",     productCount: 8,  icon: "/categories/backpack.png" },
+  { slug: "tapis-matelas",     productCount: 13, icon: "/categories/camping-tent.png" },
+  { slug: "securite",          productCount: 7,  icon: "/categories/flashlight.png" },
 ];
 
 export function Categories() {
+  const { t } = useLanguage();
   return (
     <section
       aria-labelledby="categories-title"
@@ -48,10 +53,10 @@ export function Categories() {
     >
       <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
         <SectionHeader
-          eyebrow="Catalogue · 6 collections"
-          title="Trouvez le matériel par catégorie"
-          subtitle="Sacs de couchage, tentes, sacs à dos et plus encore — testés sur le terrain, comparés côte à côte."
-          ctaLabel="Voir tout"
+          eyebrow={t("categories.eyebrow")}
+          title={t("categories.title")}
+          subtitle={t("categories.subtitle")}
+          ctaLabel={t("categories.cta")}
           ctaHref="/catalogue"
         />
 
@@ -112,7 +117,7 @@ function SectionHeader({
         >
           {ctaLabel}
           <ArrowUpRight
-            className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+            className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5"
             strokeWidth={2.2}
           />
         </Link>
@@ -124,10 +129,10 @@ function SectionHeader({
 /* ───── Category card — colorful icon tile + label stacked below ───── */
 function CategoryCard({
   slug,
-  name,
   productCount,
   icon,
 }: Category) {
+  const { t } = useLanguage();
   return (
     <TentLink
       href={`/catalogue?category=${slug}`}
@@ -159,10 +164,10 @@ function CategoryCard({
       {/* Label + count */}
       <div className="flex w-full min-w-0 flex-col items-center">
         <span className="w-full truncate font-display text-[13px] font-semibold leading-tight text-forest-900 transition-colors group-hover:text-tangerine-700 sm:text-sm">
-          {name}
+          {t(`category.${slug}`)}
         </span>
         <span className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-wood-600">
-          {productCount} produits
+          {t("categories.products", { n: productCount })}
         </span>
       </div>
     </TentLink>

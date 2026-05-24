@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
 import {
@@ -13,12 +15,7 @@ import {
 } from "lucide-react";
 
 import { TentLink } from "@/components/ui/tent-link";
-
-export const metadata = {
-  title: "À propos — BINGO",
-  description:
-    "Une boutique outdoor indépendante à Sétif. Notre histoire, nos valeurs, notre sélection.",
-};
+import { useLanguage } from "@/lib/i18n";
 
 export default function AboutPage() {
   return (
@@ -34,36 +31,34 @@ export default function AboutPage() {
 
 /* ───── Hero / intro ─────────────────────────────────────────── */
 function HeroIntro() {
+  const { t } = useLanguage();
   return (
     <section className="py-10 md:py-14">
       <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
         {/* Breadcrumb */}
         <nav
-          aria-label="Fil d'Ariane"
+          aria-label={t("breadcrumb.aria")}
           className="flex flex-wrap items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-700"
         >
           <Link href="/" className="transition-colors hover:text-tangerine-700">
-            Accueil
+            {t("breadcrumb.home")}
           </Link>
           <ChevronRight
             className="size-3 text-wood-500 rtl:rotate-180"
             strokeWidth={2.2}
           />
-          <span className="text-forest-900">À propos</span>
+          <span className="text-forest-900">{t("about.title")}</span>
         </nav>
 
         <div className="mt-6 max-w-3xl md:mt-8">
           <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.28em] text-tangerine-700">
-            Qui sommes-nous
+            {t("about.eyebrow")}
           </p>
-          <h1 className="mt-3 font-display text-[44px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 sm:text-[64px] md:text-[80px]">
-            À propos
+          <h1 className="mt-3 font-display text-[44px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 rtl:pb-2 rtl:leading-[1.25] sm:text-[64px] md:text-[80px]">
+            {t("about.title")}
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-wood-700 sm:text-lg">
-            BINGO est une boutique outdoor née à Sétif, au pied du Djurdjura.
-            Nous sélectionnons et testons sur le terrain le matériel
-            d&apos;aventure que nous voudrions emporter en bivouac — rien
-            d&apos;autre.
+            {t("about.intro")}
           </p>
         </div>
       </div>
@@ -73,6 +68,7 @@ function HeroIntro() {
 
 /* ───── Our story — split layout (image + copy) ──────────────── */
 function OurStory() {
+  const { t } = useLanguage();
   return (
     <section
       id="notre-histoire"
@@ -85,7 +81,7 @@ function OurStory() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=1400&q=85&fit=crop"
-            alt="Tente plantée face aux montagnes au coucher du soleil"
+            alt={t("about.story.imageAlt")}
             className="absolute inset-0 size-full object-cover"
             loading="lazy"
           />
@@ -98,38 +94,27 @@ function OurStory() {
         {/* Copy */}
         <div className="max-w-xl">
           <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-tangerine-700">
-            Notre histoire
+            {t("about.story.eyebrow")}
           </p>
           <h2
             id="story-title"
             className="mt-3 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] text-forest-900 sm:text-4xl md:text-[2.5rem]"
           >
-            Une boutique née sur les sentiers
+            {t("about.story.title")}
           </h2>
           <div className="mt-5 space-y-4 text-sm leading-relaxed text-wood-700 sm:text-base">
-            <p>
-              Tout a commencé dans un bivouac au Tikjda, autour d&apos;un
-              réchaud qui refusait de s&apos;allumer. Nous avons cherché du
-              matériel sérieux, à des prix justes, livrable partout en
-              Algérie. Nous n&apos;avons pas trouvé. Alors nous l&apos;avons
-              monté.
-            </p>
-            <p>
-              BINGO est une équipe de trois passionnés — randonnée,
-              alpinisme, photo — qui sélectionne les marques qu&apos;elle
-              utilise, teste chaque produit sur le terrain, et raconte ses
-              choix dans le journal.
-            </p>
+            <p>{t("about.story.p1")}</p>
+            <p>{t("about.story.p2")}</p>
             <p className="font-display text-base font-semibold italic text-forest-900 sm:text-lg">
-              « Le matériel doit servir l&apos;aventure, jamais l&apos;inverse. »
+              {t("about.story.quote")}
             </p>
           </div>
 
           {/* Mini stats */}
           <dl className="mt-8 grid grid-cols-3 gap-4 border-t border-wood-300/50 pt-6">
-            <Stat value="2025" label="Année de création" />
-            <Stat value="58" label="Wilayas livrées" />
-            <Stat value="100+" label="Produits testés" />
+            <Stat value="2025" label={t("about.story.stats.creation")} />
+            <Stat value="58" label={t("about.story.stats.wilayas")} />
+            <Stat value="100+" label={t("about.story.stats.products")} />
           </dl>
         </div>
       </div>
@@ -151,32 +136,33 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 
 /* ───── Values — 4 cards ─────────────────────────────────────── */
-type Value = { Icon: LucideIcon; title: string; text: string };
+type Value = { Icon: LucideIcon; titleKey: string; textKey: string };
 
 const VALUES: Value[] = [
   {
     Icon: Mountain,
-    title: "Testé sur le terrain",
-    text: "Aucun produit n'arrive en vitrine sans avoir traîné dans un sac à dos, dormi sous une tente, encaissé une averse.",
+    titleKey: "about.values.field.title",
+    textKey: "about.values.field.text",
   },
   {
     Icon: Leaf,
-    title: "Sélection rigoureuse",
-    text: "Moins de références, mieux choisies. Nous préférons une bonne tente à dix moyennes.",
+    titleKey: "about.values.curation.title",
+    textKey: "about.values.curation.text",
   },
   {
     Icon: Truck,
-    title: "Livré partout en Algérie",
-    text: "Livraison à domicile ou en agence Stop Desk, sous 48 h dans la plupart des wilayas.",
+    titleKey: "about.values.delivery.title",
+    textKey: "about.values.delivery.text",
   },
   {
     Icon: ShieldCheck,
-    title: "Service après-vente",
-    text: "30 jours pour changer d'avis, garantie fabricant, et un humain au bout du fil.",
+    titleKey: "about.values.support.title",
+    textKey: "about.values.support.text",
   },
 ];
 
 function Values() {
+  const { t } = useLanguage();
   return (
     <section
       aria-labelledby="values-title"
@@ -185,30 +171,30 @@ function Values() {
       <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
         <header className="max-w-2xl">
           <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-tangerine-700">
-            Ce qu&apos;on défend
+            {t("about.values.eyebrow")}
           </p>
           <h2
             id="values-title"
             className="mt-3 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] text-forest-900 sm:text-4xl md:text-[2.5rem]"
           >
-            Nos quatre engagements
+            {t("about.values.title")}
           </h2>
         </header>
 
         <ul className="mt-10 grid gap-4 sm:grid-cols-2 md:mt-12 md:gap-5 lg:grid-cols-4">
-          {VALUES.map(({ Icon, title, text }) => (
+          {VALUES.map(({ Icon, titleKey, textKey }) => (
             <li
-              key={title}
+              key={titleKey}
               className="flex flex-col rounded-2xl border border-wood-300/50 bg-cream-deep/30 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-tangerine-500/40 hover:shadow-[0_14px_28px_-14px_rgba(31,58,30,0.25)] sm:p-6"
             >
               <span className="grid size-10 place-items-center rounded-full bg-forest-900 text-cream">
                 <Icon className="size-5" strokeWidth={1.8} />
               </span>
               <h3 className="mt-4 font-display text-base font-semibold leading-snug text-forest-900 sm:text-[17px]">
-                {title}
+                {t(titleKey)}
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-wood-700">
-                {text}
+                {t(textKey)}
               </p>
             </li>
           ))}
@@ -220,6 +206,7 @@ function Values() {
 
 /* ───── Shop visit — address + hours + phone ─────────────────── */
 function ShopVisit() {
+  const { t } = useLanguage();
   return (
     <section
       aria-labelledby="shop-title"
@@ -254,30 +241,29 @@ function ShopVisit() {
         {/* Copy */}
         <div className="max-w-xl">
           <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-tangerine-300">
-            Venez nous voir
+            {t("about.shop.eyebrow")}
           </p>
           <h2
             id="shop-title"
             className="mt-3 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] sm:text-4xl md:text-[2.5rem]"
           >
-            La boutique de Sétif
+            {t("about.shop.title")}
           </h2>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-cream/80 sm:text-base">
-            Un espace de 80 m² au centre-ville de Sétif où l&apos;on essaie
-            les sacs, on grimpe sur les chaussures, et on partage les guides
-            terrain autour d&apos;un café.
+            {t("about.shop.subtitle")}
           </p>
 
           <dl className="mt-8 space-y-4">
-            <InfoRow Icon={MapPin} label="Adresse">
-              Cité Dallas, Bâtiment 3 (près de LG)
+            <InfoRow Icon={MapPin} label={t("about.shop.address.label")}>
+              {t("about.shop.address.line1")}
               <br />
-              19000 Sétif, Algérie
+              {t("about.shop.address.line2")}
             </InfoRow>
-            <InfoRow Icon={Phone} label="Téléphone">
+            <InfoRow Icon={Phone} label={t("about.shop.phone.label")}>
               <a
                 href="tel:+213673812896"
-                className="transition-colors hover:text-tangerine-300"
+                dir="ltr"
+                className="inline-block transition-colors hover:text-tangerine-300"
               >
                 +213 673 81 28 96
               </a>
@@ -290,7 +276,7 @@ function ShopVisit() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1400&q=85&fit=crop"
-            alt="Carte de la région de Sétif"
+            alt={t("about.shop.imageAlt")}
             className="absolute inset-0 size-full object-cover opacity-70"
             loading="lazy"
           />
@@ -337,24 +323,24 @@ function InfoRow({
 
 /* ───── Bottom CTA ───────────────────────────────────────────── */
 function BottomCTA() {
+  const { t } = useLanguage();
   return (
     <section className="bg-cream py-16 sm:py-20 md:py-24">
       <div className="mx-auto w-full max-w-3xl px-6 text-center md:px-10">
         <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-tangerine-700">
-          Prêt à partir
+          {t("about.cta.eyebrow")}
         </p>
         <h2 className="mt-3 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] text-forest-900 sm:text-4xl">
-          Découvrez la collection
+          {t("about.cta.title")}
         </h2>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-wood-700 sm:text-base">
-          Sacs de couchage, tentes, sacs à dos, éclairage — la sélection
-          BINGO, livrée partout en Algérie.
+          {t("about.cta.subtitle")}
         </p>
         <TentLink
           href="/catalogue"
           className="mt-8 inline-flex items-center gap-2 rounded-full bg-tangerine-500 px-6 py-3.5 font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-cream shadow-[0_10px_28px_-10px_rgba(234,108,29,0.55)] transition-all duration-300 hover:scale-[1.02] hover:bg-tangerine-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40 sm:mt-10"
         >
-          Voir le catalogue
+          {t("about.cta.btn")}
           <ArrowRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
         </TentLink>
       </div>

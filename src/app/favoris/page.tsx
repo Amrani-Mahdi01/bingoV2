@@ -13,15 +13,16 @@ import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
 import { useFavorites } from "@/lib/favorites";
+import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
 import {
   discountPercent,
-  formatDA,
   PRODUCTS,
   type Product,
 } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
 export default function FavorisPage() {
+  const { t } = useLanguage();
   const { slugs, clear } = useFavorites();
 
   // Map slugs → Product objects, dropping any that no longer exist.
@@ -38,32 +39,34 @@ export default function FavorisPage() {
       <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
         {/* Breadcrumb */}
         <nav
-          aria-label="Fil d'Ariane"
+          aria-label={t("breadcrumb.aria")}
           className="flex flex-wrap items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-700"
         >
           <Link href="/" className="transition-colors hover:text-tangerine-700">
-            Accueil
+            {t("breadcrumb.home")}
           </Link>
           <ChevronRight
             className="size-3 text-wood-500 rtl:rotate-180"
             strokeWidth={2.2}
           />
-          <span className="text-forest-900">Favoris</span>
+          <span className="text-forest-900">{t("favoris.title")}</span>
         </nav>
 
         {/* Header */}
         <header className="mt-6 flex flex-col gap-5 md:mt-8 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.28em] text-tangerine-700">
-              Votre sélection
+              {t("favoris.eyebrow")}
             </p>
-            <h1 className="mt-3 font-display text-[40px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 sm:text-[56px] md:text-[64px]">
-              Favoris
+            <h1 className="mt-3 font-display text-[40px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 rtl:pb-2 rtl:leading-[1.25] sm:text-[56px] md:text-[64px]">
+              {t("favoris.title")}
             </h1>
             <p className="mt-4 text-sm leading-relaxed text-wood-700 sm:text-base">
               {items.length === 0
-                ? "Aucun produit en favoris pour le moment. Cliquez sur le ♥ d'une fiche produit pour la garder ici."
-                : `${items.length} produit${items.length > 1 ? "s" : ""} sauvegardé${items.length > 1 ? "s" : ""}.`}
+                ? t("favoris.heroEmpty")
+                : items.length === 1
+                  ? t("favoris.count.one", { n: 1 })
+                  : t("favoris.count.many", { n: items.length })}
             </p>
           </div>
 
@@ -73,7 +76,7 @@ export default function FavorisPage() {
               onClick={() => clear()}
               className="inline-flex items-center gap-2 self-start rounded-full border border-wood-300 bg-cream px-4 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-700 transition-colors hover:border-tangerine-500 hover:text-tangerine-700 md:self-end"
             >
-              Tout vider
+              {t("favoris.clear")}
             </button>
           ) : null}
         </header>
@@ -99,6 +102,9 @@ export default function FavorisPage() {
 
 /* ───── Favorite card — same design as the rest of the catalogue ── */
 function FavoriteCard({ product }: { product: Product }) {
+  const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
   const pct = discountPercent(product.price, product.oldPrice);
   return (
     <TentLink
@@ -130,18 +136,18 @@ function FavoriteCard({ product }: { product: Product }) {
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         <h3 className="truncate font-display text-[14.5px] font-semibold leading-snug text-forest-900 sm:text-base">
-          {product.name}
+          {productName(product)}
         </h3>
         <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-wood-600">
           {product.brand}
         </p>
         <div className="mt-3 flex flex-col leading-tight">
           <span className="font-display text-lg font-bold tracking-tight text-tangerine-700 sm:text-xl">
-            {formatDA(product.price)}
+            {formatPrice(product.price)}
           </span>
           {product.oldPrice ? (
             <span className="mt-0.5 block font-mono text-[11px] text-wood-500 line-through">
-              {formatDA(product.oldPrice)}
+              {formatPrice(product.oldPrice)}
             </span>
           ) : null}
         </div>
@@ -149,7 +155,7 @@ function FavoriteCard({ product }: { product: Product }) {
         <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
           <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
-            Commander
+            {t("card.order")}
           </span>
           <AddToCartButton product={product} />
         </div>
@@ -160,23 +166,23 @@ function FavoriteCard({ product }: { product: Product }) {
 
 /* ───── Empty state ─────────────────────────────────────────────── */
 function EmptyState() {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-col items-center gap-4 rounded-2xl border border-wood-300/50 bg-cream-deep/30 px-6 py-16 text-center md:py-20">
       <span className="grid size-14 place-items-center rounded-full bg-cream text-tangerine-600 ring-1 ring-wood-300/60">
         <Heart className="size-6" strokeWidth={1.8} />
       </span>
       <h2 className="font-display text-xl font-bold text-forest-900 sm:text-2xl">
-        Aucun favori pour l&apos;instant
+        {t("favoris.empty.title")}
       </h2>
       <p className="max-w-md text-sm leading-relaxed text-wood-700">
-        Parcourez le catalogue et cliquez sur le ♥ d&apos;un produit
-        pour le retrouver ici, n&apos;importe quand.
+        {t("favoris.empty.text")}
       </p>
       <Link
         href="/catalogue"
         className="mt-2 inline-flex items-center gap-2 rounded-full bg-tangerine-500 px-5 py-2.5 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-cream shadow-[0_10px_28px_-10px_rgba(234,108,29,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-tangerine-600"
       >
-        Explorer le catalogue
+        {t("favoris.empty.cta")}
         <ArrowRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
       </Link>
     </div>

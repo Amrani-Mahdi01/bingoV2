@@ -1,5 +1,8 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Mountain } from "lucide-react";
 
 import {
@@ -7,39 +10,40 @@ import {
   InstagramIcon,
   WhatsappIcon,
 } from "@/components/icons/social";
+import { useLanguage } from "@/lib/i18n";
 
 type FooterColumn = {
-  title: string;
-  items: { label: string; href: string }[];
+  titleKey: string;
+  items: { labelKey: string; href: string }[];
 };
 
 const FOOTER_NAV: FooterColumn[] = [
   {
-    title: "Catalogue",
+    titleKey: "footer.col.catalogue",
     items: [
-      { label: "Tentes", href: "/catalogue?category=tentes" },
-      { label: "Sacs à dos", href: "/catalogue?category=sacs-a-dos" },
-      { label: "Chaussures", href: "/catalogue?category=chaussures" },
-      { label: "Éclairage", href: "/catalogue?category=eclairage" },
-      { label: "Navigation", href: "/catalogue?category=navigation" },
-      { label: "Campement", href: "/catalogue?category=campement" },
+      { labelKey: "category.tentes",           href: "/catalogue?category=tentes" },
+      { labelKey: "category.sacs-a-dos",       href: "/catalogue?category=sacs-a-dos" },
+      { labelKey: "category.chaussures",       href: "/catalogue?category=chaussures" },
+      { labelKey: "category.eclairage",        href: "/catalogue?category=eclairage" },
+      { labelKey: "category.navigation",       href: "/catalogue?category=navigation" },
+      { labelKey: "category.campement",        href: "/catalogue?category=campement" },
     ],
   },
   {
-    title: "Aide",
+    titleKey: "footer.col.help",
     items: [
-      { label: "FAQ", href: "/faq" },
-      { label: "Livraison", href: "/faq#livraison" },
-      { label: "Retours", href: "/faq#retours" },
-      { label: "Contact", href: "/contact" },
+      { labelKey: "footer.help.faq",      href: "/faq" },
+      { labelKey: "footer.help.delivery", href: "/faq#livraison" },
+      { labelKey: "footer.help.returns",  href: "/faq#retours" },
+      { labelKey: "footer.help.contact",  href: "/contact" },
     ],
   },
   {
-    title: "À propos",
+    titleKey: "footer.col.about",
     items: [
-      { label: "Notre histoire", href: "/a-propos#notre-histoire" },
-      { label: "Favoris", href: "/favoris" },
-      { label: "CGV", href: "/cgv" },
+      { labelKey: "footer.about.story",     href: "/a-propos#notre-histoire" },
+      { labelKey: "footer.about.favorites", href: "/favoris" },
+      { labelKey: "footer.about.cgv",       href: "/cgv" },
     ],
   },
 ];
@@ -59,7 +63,11 @@ const SOCIAL: Social[] = [
 ];
 
 export function Footer() {
+  const pathname = usePathname();
+  const { t } = useLanguage();
   const year = new Date().getFullYear();
+  // Admin routes use their own chrome — hide the customer footer.
+  if (pathname?.startsWith("/admin")) return null;
   return (
     <footer className="relative bg-forest-900 text-cream">
       {/* Hairline of tangerine at the top edge */}
@@ -74,7 +82,7 @@ export function Footer() {
           <div className="md:col-span-4">
             <Link
               href="/"
-              aria-label="BINGO — accueil"
+              aria-label={t("brand.home")}
               className="inline-flex items-center gap-2.5"
             >
               <span
@@ -92,8 +100,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-cream/75">
-              Matériel d&apos;aventure indépendant, sélectionné et testé
-              sur le terrain depuis Sétif.
+              {t("footer.tagline")}
             </p>
 
             {/* Social */}
@@ -116,13 +123,13 @@ export function Footer() {
 
           {/* Nav columns */}
           <nav
-            aria-label="Pied de page"
+            aria-label={t("footer.aria")}
             className="grid grid-cols-2 gap-8 md:col-span-8 md:grid-cols-3"
           >
             {FOOTER_NAV.map((col) => (
-              <div key={col.title}>
+              <div key={col.titleKey}>
                 <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-tangerine-300">
-                  {col.title}
+                  {t(col.titleKey)}
                 </p>
                 <ul className="mt-4 flex flex-col gap-2.5">
                   {col.items.map((item) => (
@@ -131,7 +138,7 @@ export function Footer() {
                         href={item.href}
                         className="text-sm text-cream/80 transition-colors hover:text-tangerine-300"
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                       </Link>
                     </li>
                   ))}
@@ -143,14 +150,14 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-12 flex flex-col gap-4 border-t border-cream/15 pt-6 text-xs text-cream/60 sm:flex-row sm:items-center sm:justify-between md:mt-16">
-          <p>© {year} BINGO Camping · Sétif, Algérie</p>
+          <p>{t("footer.copyright", { year })}</p>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
             <li>
               <Link
                 href="/cgv"
                 className="transition-colors hover:text-cream"
               >
-                CGV
+                {t("footer.about.cgv")}
               </Link>
             </li>
           </ul>

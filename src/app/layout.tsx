@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono } from "next/font/google";
+import { Cairo, DM_Sans, JetBrains_Mono } from "next/font/google";
 
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
 import { TentOverlay } from "@/components/layout/tent-overlay";
+import { AdminAuthProvider } from "@/lib/admin-auth";
+import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart";
 import { FavoritesProvider } from "@/lib/favorites";
 import { LanguageProvider } from "@/lib/i18n";
@@ -15,11 +17,11 @@ const dmSans = DM_Sans({
   display: "swap",
 });
 
-const bricolage = Bricolage_Grotesque({
+const cairo = Cairo({
   variable: "--font-display",
-  subsets: ["latin"],
+  subsets: ["latin", "arabic"],
   display: "swap",
-  axes: ["opsz"],
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -42,20 +44,24 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${dmSans.variable} ${bricolage.variable} ${jetbrainsMono.variable} h-full scroll-smooth antialiased`}
+      className={`${dmSans.variable} ${cairo.variable} ${jetbrainsMono.variable} h-full scroll-smooth antialiased`}
     >
       <body className="min-h-full flex flex-col bg-cream text-wood-800">
         <LanguageProvider>
-          <CartProvider>
-            <FavoritesProvider>
-              <Header />
-              {children}
-              <Footer />
-              {/* Tent transition overlay — hidden for now. Re-enable by
-                  uncommenting. Import + component file are kept intact. */}
-              {/* <TentOverlay /> */}
-            </FavoritesProvider>
-          </CartProvider>
+          <AdminAuthProvider>
+          <AuthProvider>
+            <CartProvider>
+              <FavoritesProvider>
+                <Header />
+                {children}
+                <Footer />
+                {/* Tent transition overlay — hidden for now. Re-enable by
+                    uncommenting. Import + component file are kept intact. */}
+                {/* <TentOverlay /> */}
+              </FavoritesProvider>
+            </CartProvider>
+          </AuthProvider>
+          </AdminAuthProvider>
         </LanguageProvider>
       </body>
     </html>

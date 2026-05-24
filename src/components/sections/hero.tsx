@@ -4,8 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowRight } from "lucide-react";
 
-import { useLanguage } from "@/lib/i18n";
-import { formatDA, PRODUCTS, type Product } from "@/lib/products";
+import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
+import { PRODUCTS, type Product } from "@/lib/products";
 import { productHref } from "@/lib/catalogue";
 
 /**
@@ -22,7 +22,7 @@ import { productHref } from "@/lib/catalogue";
  *     applied during the animation's delay window.
  */
 export function Hero() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [mounted, setMounted] = React.useState(false);
 
   // Default pile order (also what renders on SSR — same on server + first
@@ -56,7 +56,12 @@ export function Hero() {
     setPilePicks({ left: six.slice(0, 3), right: six.slice(3, 6) });
   }, []);
 
-  const letters = "BINGO".split("");
+  // Arabic script is connected — splitting per-letter would render
+  // each glyph in its isolated form (no joining). For AR we render the
+  // whole word as a single animated token; the wave animation still
+  // applies to the element as a whole.
+  const brand = t("hero.brand");
+  const letters = lang === "ar" ? [brand] : brand.split("");
 
   return (
     <section
@@ -333,18 +338,16 @@ export function Hero() {
           ))}
           <span
             aria-hidden
-            className="hero-bingo-dot ms-1 text-tangerine-500"
+            className="hero-bingo-dot ms-2 inline-block size-3 rounded-full bg-tangerine-500 align-baseline sm:size-4 md:size-[22px] lg:size-[26px]"
             style={{ animationDelay: "1710ms, 1935ms" }}
-          >
-            .
-          </span>
-          <span className="sr-only">BINGO</span>
+          />
+          <span className="sr-only">{brand}</span>
         </h1>
 
         <div aria-hidden className="hero-rule mt-4 h-px w-16 bg-wood-700/40 sm:mt-5 sm:w-20" />
 
         <p className="hero-tagline mt-3 max-w-md font-display text-[10px] font-semibold uppercase tracking-[0.24em] text-tangerine-700 sm:mt-4 sm:text-xs">
-          Le matériel d&apos;aventure, côte à côte.
+          {t("hero.tagline")}
         </p>
 
         {/* Image piles — each thumb slides in one-by-one, alternating
@@ -390,7 +393,7 @@ export function Hero() {
 
         <div className="hero-scroll mt-8 flex items-center gap-2 sm:mt-10" aria-hidden>
           <span className="font-mono text-[9.5px] uppercase tracking-[0.32em] text-wood-700/70">
-            Défiler
+            {t("hero.scroll")}
           </span>
           <ArrowDown
             className="hero-scroll-arrow size-4 text-forest-900"
@@ -416,6 +419,8 @@ function HeroPile({
   baseDelay?: number;
   stagger?: number;
 }) {
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
   const isLeft = side === "left";
   return (
     <div className="relative flex shrink-0">
@@ -430,7 +435,7 @@ function HeroPile({
           <Link
             key={p.slug}
             href={productHref(p.slug)}
-            aria-label={p.name}
+            aria-label={productName(p)}
             className={[
               "hero-pile-img",
               isLeft ? "hero-pile-img-left" : "hero-pile-img-right",
@@ -460,7 +465,7 @@ function HeroPile({
             />
             {/* Price pill */}
             <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-forest-900/90 px-2 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-cream backdrop-blur sm:text-[10.5px]">
-              {formatDA(p.price)}
+              {formatPrice(p.price)}
             </span>
           </Link>
         );

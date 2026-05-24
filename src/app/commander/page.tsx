@@ -14,7 +14,7 @@ import {
 
 import { WILAYAS } from "@/lib/algeria";
 import { useCart } from "@/lib/cart";
-import { formatDA } from "@/lib/products";
+import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type Delivery = "home" | "stop";
@@ -33,7 +33,10 @@ type FormErrors = Partial<
 >;
 
 export default function CheckoutPage() {
+  const { t } = useLanguage();
   const { items, subtotal, itemCount, clear } = useCart();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
 
   // Shipping form state
   const [firstName, setFirstName] = React.useState("");
@@ -64,17 +67,17 @@ export default function CheckoutPage() {
 
   const validate = React.useCallback((): FormErrors => {
     const e: FormErrors = {};
-    if (!firstName.trim()) e.firstName = "Le prénom est requis.";
-    if (!lastName.trim()) e.lastName = "Le nom est requis.";
+    if (!firstName.trim()) e.firstName = t("checkout.error.firstName");
+    if (!lastName.trim()) e.lastName = t("checkout.error.lastName");
     if (!phone.trim()) {
-      e.phone = "Le numéro est requis.";
+      e.phone = t("checkout.error.phone");
     } else if (!PHONE_RE.test(phone.trim())) {
-      e.phone = "Numéro invalide — ex. +213 5XX XX XX XX.";
+      e.phone = t("checkout.error.phoneInvalid");
     }
-    if (!wilayaCode) e.wilayaCode = "Sélectionnez une wilaya.";
-    if (!commune) e.commune = "Sélectionnez une commune.";
+    if (!wilayaCode) e.wilayaCode = t("checkout.error.wilaya");
+    if (!commune) e.commune = t("checkout.error.commune");
     return e;
-  }, [firstName, lastName, phone, wilayaCode, commune]);
+  }, [firstName, lastName, phone, wilayaCode, commune, t]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,17 +98,16 @@ export default function CheckoutPage() {
             <Check className="size-7" strokeWidth={2.4} />
           </span>
           <h1 className="mt-6 font-display text-3xl font-bold tracking-[-0.02em] text-forest-900 sm:text-4xl">
-            Commande reçue, merci !
+            {t("checkout.success.title")}
           </h1>
           <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-wood-700 sm:text-base">
-            Nous vous appelons sous 24 h pour confirmer la livraison.
-            Surveillez votre téléphone — l&apos;équipe BINGO va vous joindre.
+            {t("checkout.success.subtitle")}
           </p>
           <Link
             href="/"
             className="mt-8 inline-flex items-center gap-2 rounded-full bg-tangerine-500 px-6 py-3 font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-cream shadow-[0_10px_28px_-10px_rgba(234,108,29,0.55)] transition-colors hover:bg-tangerine-600"
           >
-            Retour à l&apos;accueil
+            {t("checkout.back")}
             <ArrowRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
           </Link>
         </div>
@@ -121,16 +123,16 @@ export default function CheckoutPage() {
           className="inline-flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.22em] text-wood-700 transition-colors hover:text-tangerine-700"
         >
           <ArrowLeft className="size-3.5 rtl:rotate-180" strokeWidth={2.2} />
-          Retour à l&apos;accueil
+          {t("checkout.back")}
         </Link>
 
-        <h1 className="mt-8 font-display text-3xl font-bold tracking-[-0.02em] text-forest-900 sm:text-4xl md:text-[2.5rem]">
-          Finaliser la commande
+        <h1 className="mt-8 font-display text-3xl font-bold tracking-[-0.02em] text-forest-900 rtl:pb-1 rtl:leading-[1.25] sm:text-4xl md:text-[2.5rem]">
+          {t("checkout.title")}
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-wood-700 sm:text-base">
           {itemCount > 0
-            ? `${itemCount} article${itemCount > 1 ? "s" : ""} dans votre panier. Renseignez vos informations de livraison ci-dessous.`
-            : "Votre panier est vide. Ajoutez d'abord un produit avant de passer commande."}
+            ? t("checkout.subtitle", { n: itemCount })
+            : t("checkout.subtitleEmpty")}
         </p>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_400px] lg:gap-12">
@@ -144,12 +146,12 @@ export default function CheckoutPage() {
             {/* Shipping info — contact + address in one block */}
             <section className="rounded-2xl border border-wood-300/50 bg-cream-deep/30 p-5 sm:p-6">
               <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-forest-900 sm:text-xl">
-                Informations de livraison
+                {t("checkout.shipping.title")}
               </h2>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <Field
                   id="firstName"
-                  label="Prénom"
+                  label={t("register.firstName")}
                   required
                   error={errors.firstName}
                 >
@@ -168,7 +170,7 @@ export default function CheckoutPage() {
                 </Field>
                 <Field
                   id="lastName"
-                  label="Nom"
+                  label={t("register.lastName")}
                   required
                   error={errors.lastName}
                 >
@@ -187,7 +189,7 @@ export default function CheckoutPage() {
                 </Field>
                 <Field
                   id="phone"
-                  label="Téléphone"
+                  label={t("checkout.phone")}
                   required
                   error={errors.phone}
                   className="sm:col-span-2"
@@ -202,7 +204,7 @@ export default function CheckoutPage() {
                     type="tel"
                     inputMode="tel"
                     autoComplete="tel"
-                    placeholder="+213 5XX XX XX XX"
+                    placeholder={t("checkout.phone.placeholder")}
                     maxLength={20}
                     aria-invalid={!!errors.phone}
                     className={inputClass(!!errors.phone)}
@@ -210,7 +212,7 @@ export default function CheckoutPage() {
                 </Field>
                 <Field
                   id="wilaya"
-                  label="Wilaya"
+                  label={t("checkout.wilaya")}
                   required
                   error={errors.wilayaCode}
                 >
@@ -227,13 +229,13 @@ export default function CheckoutPage() {
                       value: w.code,
                       label: `${w.code} · ${w.name}`,
                     }))}
-                    placeholder="Sélectionnez une wilaya"
+                    placeholder={t("checkout.wilaya.placeholder")}
                     error={!!errors.wilayaCode}
                   />
                 </Field>
                 <Field
                   id="commune"
-                  label="Commune"
+                  label={t("checkout.commune")}
                   required
                   error={errors.commune}
                 >
@@ -247,8 +249,8 @@ export default function CheckoutPage() {
                     options={communes.map((c) => ({ value: c, label: c }))}
                     placeholder={
                       communes.length
-                        ? "Sélectionnez une commune"
-                        : "Choisissez d'abord la wilaya"
+                        ? t("checkout.commune.placeholder")
+                        : t("checkout.commune.placeholderEmpty")
                     }
                     disabled={communes.length === 0}
                     error={!!errors.commune}
@@ -260,23 +262,23 @@ export default function CheckoutPage() {
             {/* Delivery method */}
             <section className="rounded-2xl border border-wood-300/50 bg-cream-deep/30 p-5 sm:p-6">
               <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-forest-900 sm:text-xl">
-                Mode de livraison
+                {t("checkout.delivery.title")}
               </h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <DeliveryOption
                   active={delivery === "home"}
                   onSelect={() => setDelivery("home")}
                   icon={<Truck className="size-5" strokeWidth={1.8} />}
-                  title="À domicile"
-                  description="Livré directement chez vous"
+                  title={t("checkout.delivery.home.title")}
+                  description={t("checkout.delivery.home.description")}
                   price={DELIVERY_FEE.home}
                 />
                 <DeliveryOption
                   active={delivery === "stop"}
                   onSelect={() => setDelivery("stop")}
                   icon={<Store className="size-5" strokeWidth={1.8} />}
-                  title="Stop Desk"
-                  description="À retirer en agence"
+                  title={t("checkout.delivery.stop.title")}
+                  description={t("checkout.delivery.stop.description")}
                   price={DELIVERY_FEE.stop}
                 />
               </div>
@@ -296,7 +298,7 @@ export default function CheckoutPage() {
                   : "bg-tangerine-500 hover:-translate-y-0.5 hover:bg-tangerine-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40"
               )}
             >
-              Confirmer la commande · {formatDA(total)}
+              {t("checkout.submit")} · {formatPrice(total)}
               <ArrowRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
             </button>
           </form>
@@ -304,20 +306,20 @@ export default function CheckoutPage() {
           {/* ─── Right: Order summary (shown first on mobile) ──── */}
           <aside className="order-1 self-start rounded-2xl border border-wood-300/50 bg-cream-deep/30 p-5 lg:sticky lg:top-32 lg:order-2 sm:p-6">
             <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-forest-900 sm:text-xl">
-              Votre commande
+              {t("checkout.summary.title")}
             </h2>
 
             {items.length === 0 ? (
               <div className="mt-6 flex flex-col items-center gap-3 py-6 text-center">
                 <ShoppingBag className="size-8 text-wood-400" strokeWidth={1.5} />
                 <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-wood-600">
-                  Votre panier est vide
+                  {t("checkout.summary.empty")}
                 </p>
                 <Link
                   href="/catalogue"
                   className="mt-2 font-display text-sm font-semibold text-tangerine-700 underline-offset-4 hover:underline"
                 >
-                  Parcourir le catalogue
+                  {t("checkout.summary.browse")}
                 </Link>
               </div>
             ) : (
@@ -342,17 +344,19 @@ export default function CheckoutPage() {
                     <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
                       <div className="flex min-w-0 flex-1 flex-col leading-tight">
                         <p className="truncate font-display text-[12px] font-semibold text-forest-900 sm:text-[13px]">
-                          {product.name}
+                          {productName(product)}
                         </p>
                         <p className="truncate font-mono text-[9.5px] uppercase tracking-[0.14em] text-wood-600 sm:text-[10px] sm:tracking-[0.16em]">
-                          {product.brand}
+                          {product.categorySlug
+                            ? t(`category.${product.categorySlug}`)
+                            : product.brand}
                         </p>
                         <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-wood-700 sm:text-[10.5px]">
-                          Quantité : {qty}
+                          {t("checkout.summary.qty", { n: qty })}
                         </p>
                       </div>
                       <span className="whitespace-nowrap font-display text-[13px] font-semibold text-forest-900 sm:shrink-0 sm:self-start">
-                        {formatDA(product.price * qty)}
+                        {formatPrice(product.price * qty)}
                       </span>
                     </div>
                   </li>
@@ -361,14 +365,14 @@ export default function CheckoutPage() {
             )}
 
             <dl className="mt-5 space-y-2 border-t border-wood-300/40 pt-4 font-mono text-[11px] uppercase tracking-[0.18em] text-wood-700">
-              <SummaryRow label="Sous-total" value={formatDA(subtotal)} />
+              <SummaryRow label={t("checkout.summary.subtotal")} value={formatPrice(subtotal)} />
               <SummaryRow
-                label="Livraison"
-                value={items.length > 0 ? formatDA(deliveryFee) : "—"}
+                label={t("checkout.summary.shipping")}
+                value={items.length > 0 ? formatPrice(deliveryFee) : "—"}
               />
               <div className="flex items-baseline justify-between border-t border-wood-300/40 pt-3 font-display text-base font-bold tracking-[-0.01em] text-forest-900">
-                <span>Total</span>
-                <span>{formatDA(total)}</span>
+                <span>{t("checkout.summary.total")}</span>
+                <span>{formatPrice(total)}</span>
               </div>
             </dl>
           </aside>
@@ -380,10 +384,10 @@ export default function CheckoutPage() {
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
           <div className="flex flex-col">
             <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-wood-600">
-              Total
+              {t("checkout.summary.total")}
             </span>
             <span className="font-display text-base font-bold text-forest-900">
-              {formatDA(total)}
+              {formatPrice(total)}
             </span>
           </div>
           <button
@@ -400,7 +404,7 @@ export default function CheckoutPage() {
                 : "bg-tangerine-500 hover:bg-tangerine-600"
             )}
           >
-            Confirmer
+            {t("checkout.submitShort")}
             <ArrowRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
           </button>
         </div>
@@ -414,6 +418,10 @@ export default function CheckoutPage() {
 const INPUT_BASE = [
   "h-11 w-full rounded-md border bg-cream px-3",
   "font-mono text-[13px] text-wood-800 placeholder:text-wood-500",
+  // Numeric placeholders default to LTR-like rendering and end up
+  // left-aligned in RTL contexts — force right-alignment so AR users
+  // see the placeholder + typed digits start from the right edge.
+  "rtl:text-right",
   "transition-[border-color,box-shadow] duration-200",
   "focus:outline-none focus:ring-4",
 ].join(" ");
@@ -448,6 +456,7 @@ function Combobox({
   disabled?: boolean;
   error?: boolean;
 }) {
+  const { t } = useLanguage();
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -526,7 +535,7 @@ function Combobox({
           <ul className="max-h-[260px] overflow-y-auto py-1">
             {options.length === 0 ? (
               <li className="px-3 py-4 text-center font-mono text-[11px] uppercase tracking-[0.18em] text-wood-500">
-                Aucune option
+                {t("combobox.noOptions")}
               </li>
             ) : (
               options.map((opt) => {
@@ -623,6 +632,7 @@ function DeliveryOption({
   description: string;
   price: number;
 }) {
+  const formatPrice = useFormatPrice();
   return (
     <button
       type="button"
@@ -649,7 +659,7 @@ function DeliveryOption({
           {icon}
         </span>
         <span className="font-display text-sm font-bold text-tangerine-700">
-          {formatDA(price)}
+          {formatPrice(price)}
         </span>
       </span>
       <span className="font-display text-sm font-semibold text-forest-900">

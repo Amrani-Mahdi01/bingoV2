@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import type { Product } from "@/lib/products";
+import { PRODUCTS, type Product } from "@/lib/products";
 
 export type CartItem = { product: Product; qty: number };
 
@@ -28,12 +28,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = React.useState<CartItem[]>([]);
 
   // Hydrate from localStorage on mount (client-only).
+  // We re-resolve each stored item against the live PRODUCTS catalog
+  // so the cart always reflects the latest product data — translated
+  // names, prices, descriptions — even for items that were added
+  // before those fields existed. Items whose slug no longer exists
+  // are dropped.
   React.useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as CartItem[];
-      if (Array.isArray(parsed)) setItems(parsed);
+      if (!Array.isArray(parsed)) return;
+      const refreshed = parsed
+        .map((i) => {
+          const fresh = PRODUCTS.find((p) => p.slug === i.product?.slug);
+          return fresh ? { product: fresh, qty: i.qty } : null;
+        })
+        .filter((i): i is CartItem => i !== null);
+      setItems(refreshed);
     } catch {
       /* ignore */
     }

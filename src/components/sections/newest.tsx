@@ -1,9 +1,12 @@
+"use client";
+
 import * as React from "react";
 import { ShoppingBag } from "lucide-react";
 
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
+import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
 import { PRODUCTS } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
@@ -56,10 +59,8 @@ const NEWEST: Array<{
   },
 ];
 
-const formatPrice = (value: number) =>
-  new Intl.NumberFormat("fr-DZ", { maximumFractionDigits: 0 }).format(value) + " DA";
-
 export function Newest() {
+  const { t } = useLanguage();
   return (
     <section
       aria-labelledby="newest-title"
@@ -130,17 +131,16 @@ export function Newest() {
         <header className="flex flex-col gap-5">
           <div className="max-w-2xl">
             <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-tangerine-300">
-              Nouveautés · Cette semaine
+              {t("newest.eyebrow")}
             </p>
             <h2
               id="newest-title"
               className="mt-3 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] text-cream sm:text-4xl md:text-[2.5rem]"
             >
-              Tout juste arrivé
+              {t("newest.title")}
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-cream/75 sm:text-base">
-              Les dernières arrivées en boutique — encore tièdes du
-              déballage.
+              {t("newest.subtitle")}
             </p>
           </div>
         </header>
@@ -173,8 +173,12 @@ function ProductCard({
   oldPrice?: number;
   image: string;
 }) {
+  const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
   const pct = discountPercent(price, oldPrice);
   const fullProduct = PRODUCTS.find((p) => p.slug === slug);
+  const displayName = productName({ name, nameAr: fullProduct?.nameAr });
   return (
     <TentLink
       href={`/produit/${slug}`}
@@ -202,7 +206,7 @@ function ProductCard({
               className="size-1.5 rounded-full bg-cream"
               style={{ animation: "newest-dot-pulse 1.8s ease-in-out infinite" }}
             />
-            Nouveau
+            {t("card.badge.new")}
           </span>
 
           {pct ? (
@@ -217,7 +221,7 @@ function ProductCard({
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         <h3 className="truncate font-display text-[14.5px] font-semibold leading-snug text-cream sm:text-base">
-          {name}
+          {displayName}
         </h3>
         <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-cream/65">
           {brand}
@@ -236,7 +240,7 @@ function ProductCard({
         <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
           <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-tangerine-500 bg-tangerine-500 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-400 hover:text-forest-900 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
-            Commander
+            {t("card.order")}
           </span>
           <AddToCartButton
             product={fullProduct}

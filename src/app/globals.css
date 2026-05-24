@@ -213,3 +213,136 @@
 .bingo-scrollbar::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* -----------------------------------------------------------
+   Admin scope — clean neutral palette (zinc + blue accent).
+   Anything rendered inside `[data-admin]` re-maps all the
+   shadcn semantic tokens so cards/charts/forms pick up the
+   neutral look without per-component class rewrites.
+   ----------------------------------------------------------- */
+[data-admin] {
+  /* Geist Sans + Geist Mono drive everything inside the admin tree.
+     The `--admin-font-*` variables are emitted by next/font/google in
+     app/(admin)/admin/layout.tsx and inherited here. */
+  --font-display: var(--admin-font-sans), system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-body: var(--admin-font-sans), system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-sans: var(--admin-font-sans), system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono: var(--admin-font-mono), "JetBrains Mono", ui-monospace,
+    "SFMono-Regular", Menlo, monospace;
+
+  --background: #fafafa;
+  --foreground: #18181b;
+
+  --card: #ffffff;
+  --card-foreground: #18181b;
+
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #fafafa;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #18181b;
+
+  --chart-1: #3b82f6; /* blue */
+  --chart-2: #10b981; /* emerald */
+  --chart-3: #f59e0b; /* amber */
+  --chart-4: #8b5cf6; /* violet */
+  --chart-5: #64748b; /* slate */
+
+  /* Apply the admin font-family directly — body's font-family rule lives
+     on <body> (outside this scope), so we need to (re)assert it here. */
+  font-family: var(--font-sans);
+}
+
+[data-admin] h1,
+[data-admin] h2,
+[data-admin] h3,
+[data-admin] h4 {
+  font-family: var(--font-sans);
+  letter-spacing: -0.015em;
+}
+
+/* Safety overrides — shared typography/UI components bake in brand
+   color classes (text-wood-*, text-ink, bg-cream, etc.). Inside the
+   admin scope we neutralize them to the zinc palette so anything
+   shared with the storefront still reads as a clean dashboard. */
+[data-admin] .text-ink {
+  color: #18181b;
+}
+[data-admin] .text-cream {
+  color: #fafafa;
+}
+[data-admin] .text-wood-400 {
+  color: #a1a1aa;
+}
+[data-admin] .text-wood-500 {
+  color: #71717a;
+}
+[data-admin] .text-wood-600 {
+  color: #52525b;
+}
+[data-admin] .text-wood-700 {
+  color: #3f3f46;
+}
+[data-admin] .text-wood-800 {
+  color: #27272a;
+}
+[data-admin] .text-forest-700,
+[data-admin] .text-forest-800 {
+  color: #18181b;
+}
+[data-admin] .text-ember {
+  color: #dc2626;
+}
+[data-admin] .text-tangerine-500,
+[data-admin] .text-tangerine-600 {
+  color: #2563eb;
+}
+[data-admin] .bg-cream {
+  background-color: #ffffff;
+}
+[data-admin] .bg-parchment {
+  background-color: #fafafa;
+}
+[data-admin] .bg-wood-100 {
+  background-color: #f4f4f5;
+}
+[data-admin] .bg-wood-200 {
+  background-color: #e4e4e7;
+}
+[data-admin] .bg-forest-700,
+[data-admin] .bg-forest-800,
+[data-admin] .bg-forest-900,
+[data-admin] .bg-forest-950 {
+  background-color: #18181b;
+}
+[data-admin] .bg-ember {
+  background-color: #dc2626;
+}
+[data-admin] .bg-tangerine-500 {
+  background-color: #2563eb;
+}
+[data-admin] .font-display {
+  font-family: var(--font-sans);
+  letter-spacing: -0.015em;
+}
+
+/* admin scope appended */

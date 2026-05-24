@@ -18,19 +18,19 @@ import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
 import { CATEGORIES } from "@/lib/catalogue";
+import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
 import {
   discountPercent,
-  formatDA,
   PRODUCTS,
   type Product,
 } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
 const SORTS = [
-  { value: "popular", label: "Populaires" },
-  { value: "newest", label: "Nouveautés" },
-  { value: "price-asc", label: "Prix croissant" },
-  { value: "price-desc", label: "Prix décroissant" },
+  { value: "popular",    labelKey: "sort.popular" },
+  { value: "newest",     labelKey: "sort.newest" },
+  { value: "price-asc",  labelKey: "sort.priceAsc" },
+  { value: "price-desc", labelKey: "sort.priceDesc" },
 ] as const;
 
 type SortValue = (typeof SORTS)[number]["value"];
@@ -40,7 +40,7 @@ const PRICE_MIN = 0;
 const PRICE_MAX = 50000;
 const PRICE_STEP = 500;
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 9;
 
 /** Best-effort manufacturer extraction from `product.brand`.
  *  "Marmot Lithium 0" → "Marmot", "Hydro Flask Wide" → "Hydro Flask". */
@@ -66,7 +66,9 @@ function readSort(raw: string | null): SortValue | null {
 }
 
 function CatalogueContent() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
+  const formatPrice = useFormatPrice();
   // Read filter intent from the URL (e.g. ?promo=1 from the
   // header "Promotions" link, ?category=tentes from a category tile,
   // ?sort=popular from the best-sellers "Voir le classement" CTA).
@@ -261,7 +263,7 @@ function CatalogueContent() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <p className="font-display text-sm font-bold tracking-[-0.01em] text-forest-900">
-          Filtres
+          {t("filters.title")}
         </p>
         <button
           type="button"
@@ -274,12 +276,12 @@ function CatalogueContent() {
               : "cursor-not-allowed text-wood-500"
           )}
         >
-          Aucun
+          {t("filters.clear")}
         </button>
       </div>
 
       {/* Catégories */}
-      <FilterSection title="Catégories">
+      <FilterSection title={t("filters.section.categories")}>
         <ul className="flex flex-col">
           <li>
             <CategoryRow
@@ -289,7 +291,7 @@ function CatalogueContent() {
                 setActiveSubCategory(null);
               }}
             >
-              Toutes les catégories
+              {t("filters.allCategories")}
             </CategoryRow>
           </li>
           {CATEGORIES.map((c) => {
@@ -313,7 +315,7 @@ function CatalogueContent() {
                   expanded={expanded}
                   onToggleExpand={() => toggleCategoryExpansion(c.slug)}
                 >
-                  {c.name}
+                  {t(`category.${c.slug}`)}
                 </CategoryRow>
                 {hasSubs && expanded ? (
                   <ul className="mt-0.5 flex flex-col">
@@ -326,7 +328,7 @@ function CatalogueContent() {
                             setActiveSubCategory(sc.slug);
                           }}
                         >
-                          {sc.name}
+                          {t(`subcat.${sc.parentSlug}.${sc.slug}`)}
                         </SubCategoryRow>
                       </li>
                     ))}
@@ -340,10 +342,10 @@ function CatalogueContent() {
 
       {/* Prix */}
       <FilterSection
-        title="Prix"
+        title={t("filters.section.price")}
         trailing={
           <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-wood-700">
-            {formatDA(priceMin)} — {formatDA(priceMax)}
+            {formatPrice(priceMin)} — {formatPrice(priceMax)}
           </span>
         }
       >
@@ -359,12 +361,12 @@ function CatalogueContent() {
         />
         <div className="mt-4 grid grid-cols-2 gap-2">
           <PriceField
-            label="Min"
+            label={t("filters.price.min")}
             value={priceMin}
             onChange={(v) => setPriceMin(Math.min(Math.max(0, v), priceMax))}
           />
           <PriceField
-            label="Max"
+            label={t("filters.price.max")}
             value={priceMax}
             onChange={(v) =>
               setPriceMax(Math.max(Math.min(PRICE_MAX, v), priceMin))
@@ -374,7 +376,7 @@ function CatalogueContent() {
       </FilterSection>
 
       {/* Marques */}
-      <FilterSection title="Marques">
+      <FilterSection title={t("filters.section.brands")}>
         <div className="relative">
           <Search
             className="pointer-events-none absolute start-3 top-1/2 size-3.5 -translate-y-1/2 text-wood-600"
@@ -384,15 +386,15 @@ function CatalogueContent() {
             type="search"
             value={brandsQuery}
             onChange={(e) => setBrandsQuery(e.target.value)}
-            placeholder="Rechercher une marque…"
-            aria-label="Rechercher une marque"
+            placeholder={t("filters.brands.placeholder")}
+            aria-label={t("filters.brands.aria")}
             className="h-9 w-full rounded-md border border-wood-300 bg-cream ps-9 pe-3 font-mono text-[11.5px] text-wood-800 placeholder:text-wood-500 transition-[border-color,box-shadow] duration-200 focus:border-tangerine-500 focus:outline-none focus:ring-4 focus:ring-tangerine-500/15"
           />
         </div>
         <ul className="mt-3 flex flex-col gap-0.5">
           {visibleBrandsList.length === 0 ? (
             <li className="px-2 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-500">
-              Aucune marque
+              {t("filters.brands.none")}
             </li>
           ) : (
             visibleBrandsList.map((b) => (
@@ -413,7 +415,7 @@ function CatalogueContent() {
             onClick={() => setShowAllBrands(true)}
             className="mt-2 inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-tangerine-700 transition-colors hover:text-tangerine-600"
           >
-            Voir plus ({hiddenBrandsCount})
+            {t("filters.brands.more", { n: hiddenBrandsCount })}
             <ChevronDown className="size-3" strokeWidth={2.4} />
           </button>
         ) : null}
@@ -423,7 +425,7 @@ function CatalogueContent() {
             onClick={() => setShowAllBrands(false)}
             className="mt-2 inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-700 transition-colors hover:text-tangerine-700"
           >
-            Voir moins
+            {t("filters.brands.less")}
             <ChevronDown
               className="size-3 rotate-180"
               strokeWidth={2.4}
@@ -433,13 +435,13 @@ function CatalogueContent() {
       </FilterSection>
 
       {/* Disponibilité — last section, no bottom divider */}
-      <FilterSection title="Disponibilité" last>
+      <FilterSection title={t("filters.section.availability")} last>
         <div className="flex flex-col gap-0.5">
           <CheckRow checked={inStockOnly} onChange={setInStockOnly}>
-            En stock uniquement
+            {t("filters.availability.inStock")}
           </CheckRow>
           <CheckRow checked={promosOnly} onChange={setPromosOnly}>
-            Produits en promotion
+            {t("filters.availability.promo")}
           </CheckRow>
         </div>
       </FilterSection>
@@ -451,14 +453,14 @@ function CatalogueContent() {
       <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
         {/* Breadcrumb */}
         <nav
-          aria-label="Fil d'Ariane"
+          aria-label={t("breadcrumb.aria")}
           className="flex flex-wrap items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-700"
         >
           <Link
             href="/"
             className="transition-colors hover:text-tangerine-700"
           >
-            Accueil
+            {t("breadcrumb.home")}
           </Link>
           <ChevronRight
             className="size-3 text-wood-500 rtl:rotate-180"
@@ -471,30 +473,33 @@ function CatalogueContent() {
                 onClick={() => setActiveCategory(null)}
                 className="transition-colors hover:text-tangerine-700"
               >
-                Catalogue
+                {t("breadcrumb.catalogue")}
               </button>
               <ChevronRight
                 className="size-3 text-wood-500 rtl:rotate-180"
                 strokeWidth={2.2}
               />
-              <span className="text-forest-900">{selectedCategory.name}</span>
+              <span className="text-forest-900">
+                {t(`category.${selectedCategory.slug}`)}
+              </span>
             </>
           ) : (
-            <span className="text-forest-900">Catalogue</span>
+            <span className="text-forest-900">{t("breadcrumb.catalogue")}</span>
           )}
         </nav>
 
         {/* Page header — eyebrow / big title / subtitle */}
         <header className="mt-6 max-w-3xl md:mt-8">
           <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.28em] text-tangerine-700">
-            Boutique
+            {t("catalogue.eyebrow")}
           </p>
-          <h1 className="mt-3 font-display text-[44px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 sm:text-[64px] md:text-[80px]">
-            {selectedCategory ? selectedCategory.name : "Catalogue"}
+          <h1 className="mt-3 font-display text-[44px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 rtl:pb-2 rtl:leading-[1.25] sm:text-[64px] md:text-[80px]">
+            {selectedCategory
+              ? t(`category.${selectedCategory.slug}`)
+              : t("catalogue.title")}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-wood-700 sm:text-base">
-            Toute notre sélection — testée, choisie, livrée dans toute
-            l&apos;Algérie.
+            {t("catalogue.subtitle")}
           </p>
         </header>
 
@@ -508,8 +513,8 @@ function CatalogueContent() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher tente, sac de couchage, lampe frontale…"
-            aria-label="Rechercher dans le catalogue"
+            placeholder={t("catalogue.search.placeholder")}
+            aria-label={t("catalogue.search.aria")}
             className={cn(
               "h-12 w-full rounded-full border border-wood-300 bg-cream-deep/40 ps-11 pe-11",
               "font-mono text-[13px] text-wood-800 placeholder:text-wood-500",
@@ -522,7 +527,7 @@ function CatalogueContent() {
             <button
               type="button"
               onClick={() => setQuery("")}
-              aria-label="Effacer la recherche"
+              aria-label={t("catalogue.search.clearAria")}
               className="absolute end-2.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-wood-700 transition-colors hover:bg-wood-100 hover:text-forest-900"
             >
               <X className="size-4" strokeWidth={2.2} />
@@ -538,7 +543,7 @@ function CatalogueContent() {
             className="inline-flex items-center gap-2 rounded-full border border-wood-300 bg-cream px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-forest-900 transition-colors hover:border-forest-900 lg:hidden"
           >
             <SlidersHorizontal className="size-4" strokeWidth={2} />
-            Filtres
+            {t("filters.title")}
             {hasFilters ? (
               <span className="inline-grid size-4 place-items-center rounded-full bg-tangerine-500 font-display text-[9px] font-bold text-cream">
                 {(activeCategory ? 1 : 0) +
@@ -548,10 +553,13 @@ function CatalogueContent() {
             ) : null}
           </button>
           <span className="hidden font-mono text-[11px] uppercase tracking-[0.18em] text-wood-600 lg:inline">
-            {visible.length} résultat{visible.length > 1 ? "s" : ""}
+            {t("toolbar.results", { n: visible.length })}
             {selectedCategory ? (
               <>
-                {" "}· <span className="text-forest-900">{selectedCategory.name}</span>
+                {" "}·{" "}
+                <span className="text-forest-900">
+                  {t(`category.${selectedCategory.slug}`)}
+                </span>
               </>
             ) : null}
           </span>
@@ -569,12 +577,12 @@ function CatalogueContent() {
           <div ref={gridTopRef} className="scroll-mt-32">
             {/* Result count — mobile only; desktop shows it in the toolbar */}
             <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.18em] text-wood-600 lg:hidden">
-              {visible.length} résultat{visible.length > 1 ? "s" : ""}
+              {t("toolbar.results", { n: visible.length })}
               {selectedCategory ? (
                 <>
                   {" "}·{" "}
                   <span className="text-forest-900">
-                    {selectedCategory.name}
+                    {t(`category.${selectedCategory.slug}`)}
                   </span>
                 </>
               ) : null}
@@ -618,6 +626,9 @@ function CatalogueContent() {
 
 /* ───── Catalogue card — same design as best-sellers ───────────── */
 function CatalogueCard({ product }: { product: Product }) {
+  const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
   const pct = discountPercent(product.price, product.oldPrice);
   return (
     <TentLink
@@ -649,18 +660,18 @@ function CatalogueCard({ product }: { product: Product }) {
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         <h3 className="truncate font-display text-[14.5px] font-semibold leading-snug text-forest-900 sm:text-base">
-          {product.name}
+          {productName(product)}
         </h3>
         <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-wood-600">
           {product.brand}
         </p>
         <div className="mt-3 flex flex-col leading-tight">
           <span className="font-display text-lg font-bold tracking-tight text-tangerine-700 sm:text-xl">
-            {formatDA(product.price)}
+            {formatPrice(product.price)}
           </span>
           {product.oldPrice ? (
             <span className="mt-0.5 block font-mono text-[11px] text-wood-500 line-through">
-              {formatDA(product.oldPrice)}
+              {formatPrice(product.oldPrice)}
             </span>
           ) : null}
         </div>
@@ -668,7 +679,7 @@ function CatalogueCard({ product }: { product: Product }) {
         <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
           <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
-            Commander
+            {t("card.order")}
           </span>
           <AddToCartButton product={product} />
         </div>
@@ -725,6 +736,7 @@ function CategoryRow({
   onToggleExpand?: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="flex items-center gap-1">
       <button
@@ -755,7 +767,11 @@ function CategoryRow({
         <button
           type="button"
           onClick={onToggleExpand}
-          aria-label={expanded ? "Replier" : "Déplier"}
+          aria-label={
+            expanded
+              ? t("filters.category.collapse")
+              : t("filters.category.expand")
+          }
           aria-expanded={expanded}
           className="grid size-6 shrink-0 place-items-center rounded-md text-wood-600 transition-colors hover:bg-cream-deep/70 hover:text-forest-900"
         >
@@ -885,6 +901,7 @@ function DualRange({
   value: [number, number];
   onChange: (next: [number, number]) => void;
 }) {
+  const { t } = useLanguage();
   const [lo, hi] = value;
   const span = max - min;
   const loPct = ((lo - min) / span) * 100;
@@ -935,10 +952,16 @@ function DualRange({
 
       {/* Track */}
       <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-wood-300" />
-      {/* Active range */}
+      {/* Active range — uses logical inset-inline-start/end so it
+          mirrors automatically in RTL, matching the browser's native
+          flip of <input type="range"> thumbs (min on the start side,
+          max on the end side, in both directions). */}
       <div
         className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-tangerine-500"
-        style={{ left: `${loPct}%`, right: `${100 - hiPct}%` }}
+        style={{
+          insetInlineStart: `${loPct}%`,
+          insetInlineEnd: `${100 - hiPct}%`,
+        }}
       />
       {/* Low thumb */}
       <input
@@ -952,7 +975,7 @@ function DualRange({
           const v = Math.min(Number(e.target.value), hi - step);
           onChange([Math.max(min, v), hi]);
         }}
-        aria-label="Prix minimum"
+        aria-label={t("filters.price.minAria")}
       />
       {/* High thumb */}
       <input
@@ -966,7 +989,7 @@ function DualRange({
           const v = Math.max(Number(e.target.value), lo + step);
           onChange([lo, Math.min(max, v)]);
         }}
-        aria-label="Prix maximum"
+        aria-label={t("filters.price.maxAria")}
       />
     </div>
   );
@@ -979,6 +1002,7 @@ function SortMenu({
   value: SortValue;
   onChange: (v: SortValue) => void;
 }) {
+  const { t } = useLanguage();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -1014,8 +1038,8 @@ function SortMenu({
           open ? "border-forest-900" : "border-wood-300"
         )}
       >
-        <span className="hidden sm:inline text-wood-600">Trier ·</span>
-        {current.label}
+        <span className="hidden sm:inline text-wood-600">{t("sort.prefix")}</span>
+        {t(current.labelKey)}
         <ChevronDown
           className={cn(
             "size-3.5 transition-transform duration-200",
@@ -1046,7 +1070,7 @@ function SortMenu({
                       : "text-wood-800 hover:bg-cream-deep hover:text-forest-900"
                   )}
                 >
-                  <span>{s.label}</span>
+                  <span>{t(s.labelKey)}</span>
                   {active ? (
                     <Check
                       className="size-4 text-tangerine-300"
@@ -1087,10 +1111,11 @@ function Pagination({
   totalPages: number;
   onChange: (next: number) => void;
 }) {
+  const { t } = useLanguage();
   const pages = buildPageList(page, totalPages);
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t("pagination.aria")}
       className="mt-10 flex items-center justify-center gap-1.5 sm:gap-2"
     >
       <PaginationArrow
@@ -1112,7 +1137,7 @@ function Pagination({
             key={p}
             type="button"
             onClick={() => onChange(p)}
-            aria-label={`Aller à la page ${p}`}
+            aria-label={t("pagination.go", { n: p })}
             aria-current={page === p ? "page" : undefined}
             className={cn(
               "grid size-9 place-items-center rounded-full font-display text-[13px] font-semibold transition-colors",
@@ -1143,6 +1168,7 @@ function PaginationArrow({
   disabled: boolean;
   onClick: () => void;
 }) {
+  const { t } = useLanguage();
   const isPrev = direction === "prev";
   const Icon = isPrev ? ChevronLeft : ChevronRight;
   return (
@@ -1150,7 +1176,7 @@ function PaginationArrow({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label={isPrev ? "Page précédente" : "Page suivante"}
+      aria-label={isPrev ? t("pagination.prev") : t("pagination.next")}
       className={cn(
         "grid size-9 place-items-center rounded-full border transition-colors",
         disabled
@@ -1164,23 +1190,24 @@ function PaginationArrow({
 }
 
 function EmptyState({ onReset }: { onReset: () => void }) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-wood-300/50 bg-cream-deep/30 px-6 py-16 text-center">
       <span className="grid size-12 place-items-center rounded-full bg-cream ring-1 ring-wood-300/60">
         <ShoppingBag className="size-5 text-wood-600" strokeWidth={1.8} />
       </span>
       <p className="font-display text-base font-semibold text-forest-900">
-        Aucun produit ne correspond à vos filtres
+        {t("catalogue.empty.title")}
       </p>
       <p className="max-w-md text-sm text-wood-700">
-        Essayez d&apos;élargir votre recherche ou réinitialisez les filtres.
+        {t("catalogue.empty.subtitle")}
       </p>
       <button
         type="button"
         onClick={onReset}
         className="mt-2 inline-flex items-center gap-2 rounded-full bg-forest-900 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-cream transition-colors hover:bg-forest-700"
       >
-        Réinitialiser
+        {t("catalogue.empty.reset")}
       </button>
     </div>
   );
@@ -1196,6 +1223,7 @@ function MobileFiltersDrawer({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useLanguage();
   React.useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -1221,7 +1249,7 @@ function MobileFiltersDrawer({
       {/* Backdrop */}
       <button
         type="button"
-        aria-label="Fermer les filtres"
+        aria-label={t("mobileFilters.closeAria")}
         onClick={onClose}
         tabIndex={open ? 0 : -1}
         className={cn(
@@ -1233,7 +1261,7 @@ function MobileFiltersDrawer({
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label="Filtres"
+        aria-label={t("filters.title")}
         className={cn(
           "absolute inset-y-0 start-0 flex w-[min(85vw,360px)] flex-col bg-cream shadow-[0_-8px_60px_-12px_rgba(31,58,30,0.4)]",
           "transition-transform duration-300 ease-out",
@@ -1244,12 +1272,12 @@ function MobileFiltersDrawer({
       >
         <header className="flex items-center justify-between border-b border-wood-300/40 px-5 py-4">
           <p className="font-display text-base font-bold text-forest-900">
-            Filtres
+            {t("filters.title")}
           </p>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={t("mobileFilters.close")}
             className="grid size-9 place-items-center rounded-full text-wood-800 transition-colors hover:bg-wood-100 hover:text-forest-900"
           >
             <X className="size-4" strokeWidth={1.8} />
@@ -1264,7 +1292,7 @@ function MobileFiltersDrawer({
             onClick={onClose}
             className="w-full rounded-full bg-tangerine-500 px-4 py-3 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-cream transition-colors hover:bg-tangerine-600"
           >
-            Voir les résultats
+            {t("mobileFilters.show")}
           </button>
         </footer>
       </aside>

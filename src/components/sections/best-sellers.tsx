@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight, ShoppingBag } from "lucide-react";
@@ -5,6 +7,7 @@ import { ArrowUpRight, ShoppingBag } from "lucide-react";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
+import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
 import { PRODUCTS } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
@@ -57,10 +60,8 @@ const BEST_SELLERS: Array<{
   },
 ];
 
-const formatPrice = (value: number) =>
-  new Intl.NumberFormat("fr-DZ", { maximumFractionDigits: 0 }).format(value) + " DA";
-
 export function BestSellers() {
+  const { t } = useLanguage();
   return (
     <section
       aria-labelledby="best-sellers-title"
@@ -76,26 +77,25 @@ export function BestSellers() {
         <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-tangerine-700">
-              Best-sellers · Choix de l&apos;équipe
+              {t("best.eyebrow")}
             </p>
             <h2
               id="best-sellers-title"
               className="mt-3 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] text-forest-900 sm:text-4xl md:text-[2.5rem]"
             >
-              Les plus vendus ce mois-ci
+              {t("best.title")}
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-wood-700 sm:text-base">
-              Notre top 4 des produits les plus comparés et achetés — testés sur
-              le terrain, validés par la communauté.
+              {t("best.subtitle")}
             </p>
           </div>
           <Link
             href="/catalogue?sort=popular"
             className="group inline-flex items-center gap-1.5 self-start font-display text-sm font-medium text-forest-900 underline-offset-4 transition-colors hover:text-tangerine-700 hover:underline md:self-end"
           >
-            Voir le classement complet
+            {t("best.cta")}
             <ArrowUpRight
-              className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+              className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5"
               strokeWidth={2.2}
             />
           </Link>
@@ -130,10 +130,14 @@ function ProductCard({
   oldPrice?: number;
   image: string;
 }) {
+  const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
   const pct = discountPercent(price, oldPrice);
   // Look up the full product (with description, images, etc.) so the
   // cart icon can push the canonical Product object into the cart.
   const fullProduct = PRODUCTS.find((p) => p.slug === slug);
+  const displayName = productName({ name, nameAr: fullProduct?.nameAr });
   return (
     <TentLink
       href={`/produit/${slug}`}
@@ -164,7 +168,7 @@ function ProductCard({
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         <h3 className="truncate font-display text-[14.5px] font-semibold leading-snug text-forest-900 sm:text-base">
-          {name}
+          {displayName}
         </h3>
         <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-wood-600">
           {brand}
@@ -186,7 +190,7 @@ function ProductCard({
         <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
           <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
-            Commander
+            {t("card.order")}
           </span>
           <AddToCartButton product={fullProduct} />
         </div>
@@ -202,6 +206,10 @@ function ProductCard({
 function Compass({ className }: { className?: string }) {
   // 32 tick marks around the bezel (every 11.25°). Cardinal & inter-
   // cardinal ticks are slightly longer so the rose reads at a glance.
+  // Round floating-point trig output to a stable decimal precision so
+  // server + client agree on the serialized SVG attribute strings
+  // (otherwise the last digits diverge and React hydration warns).
+  const round = (n: number) => Math.round(n * 1000) / 1000;
   const ticks = Array.from({ length: 32 }, (_, i) => {
     const angle = (i / 32) * Math.PI * 2;
     const isCardinal = i % 8 === 0;
@@ -209,10 +217,10 @@ function Compass({ className }: { className?: string }) {
     const outer = 116;
     const inner = isCardinal ? 100 : isInter ? 104 : 108;
     return {
-      x1: 120 + Math.sin(angle) * outer,
-      y1: 120 - Math.cos(angle) * outer,
-      x2: 120 + Math.sin(angle) * inner,
-      y2: 120 - Math.cos(angle) * inner,
+      x1: round(120 + Math.sin(angle) * outer),
+      y1: round(120 - Math.cos(angle) * outer),
+      x2: round(120 + Math.sin(angle) * inner),
+      y2: round(120 - Math.cos(angle) * inner),
       width: isCardinal ? 2 : isInter ? 1.4 : 0.8,
     };
   });

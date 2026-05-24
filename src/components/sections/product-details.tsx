@@ -20,8 +20,13 @@ import { TentLink } from "@/components/ui/tent-link";
 import { productHref } from "@/lib/catalogue";
 import { useCart } from "@/lib/cart";
 import {
+  useFormatPrice,
+  useLanguage,
+  useProductDescription,
+  useProductName,
+} from "@/lib/i18n";
+import {
   discountPercent,
-  formatDA,
   PRODUCTS,
   type Product,
 } from "@/lib/products";
@@ -34,13 +39,18 @@ import { cn } from "@/lib/utils";
  */
 export function ProductDetails({ product }: { product: Product }) {
   const router = useRouter();
+  const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
+  const productDescription = useProductDescription();
+  const description = productDescription(product);
   const pct = discountPercent(product.price, product.oldPrice);
   const [qty, setQty] = React.useState(1);
   const [expanded, setExpanded] = React.useState(false);
   const [added, setAdded] = React.useState(false);
   const { addItem } = useCart();
 
-  const isLong = product.description.length > 160;
+  const isLong = description.length > 160;
 
   // Push the current product (× qty) into the shared cart and flash
   // the buttons to "Ajouté ✓" for a moment as confirmation.
@@ -80,15 +90,15 @@ export function ProductDetails({ product }: { product: Product }) {
           href="/"
           className="inline-flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.22em] text-wood-700 transition-colors hover:text-tangerine-700"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={2.2} />
-          Retour à l&apos;accueil
+          <ArrowLeft className="size-3.5 rtl:rotate-180" strokeWidth={2.2} />
+          {t("product.back")}
         </TentLink>
 
         <div className="mt-8 grid gap-8 md:mt-12 md:grid-cols-2 md:gap-10 lg:gap-16">
           {/* Image slider */}
           <ProductImageSlider
             images={sliderImages}
-            name={product.name}
+            name={productName(product)}
             discount={pct}
           />
 
@@ -98,16 +108,16 @@ export function ProductDetails({ product }: { product: Product }) {
               {product.brand}
             </p>
             <h1 className="mt-2 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] text-forest-900 sm:text-4xl md:text-5xl">
-              {product.name}
+              {productName(product)}
             </h1>
 
             <div className="mt-6 flex flex-col leading-tight">
               <span className="font-display text-3xl font-bold tracking-tight text-tangerine-700 md:text-4xl">
-                {formatDA(product.price)}
+                {formatPrice(product.price)}
               </span>
               {product.oldPrice ? (
                 <span className="mt-1 font-mono text-sm text-wood-500 line-through">
-                  {formatDA(product.oldPrice)}
+                  {formatPrice(product.oldPrice)}
                 </span>
               ) : null}
             </div>
@@ -120,7 +130,7 @@ export function ProductDetails({ product }: { product: Product }) {
                   isLong && !expanded && "line-clamp-3"
                 )}
               >
-                {product.description}
+                {description}
               </p>
               {isLong ? (
                 <button
@@ -129,7 +139,7 @@ export function ProductDetails({ product }: { product: Product }) {
                   aria-expanded={expanded}
                   className="mt-2 font-display text-sm font-semibold text-tangerine-700 underline-offset-4 transition-colors hover:text-tangerine-600 hover:underline"
                 >
-                  {expanded ? "Lire moins" : "Lire la suite…"}
+                  {expanded ? t("product.readLess") : t("product.readMore")}
                 </button>
               ) : null}
             </div>
@@ -137,13 +147,13 @@ export function ProductDetails({ product }: { product: Product }) {
             {/* Quantity stepper */}
             <div className="mt-7 flex items-center gap-4">
               <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-wood-700">
-                Quantité
+                {t("product.qty.label")}
               </span>
               <div className="inline-flex items-center rounded-full border border-wood-300 bg-cream">
                 <button
                   type="button"
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  aria-label="Diminuer la quantité"
+                  aria-label={t("product.qty.dec")}
                   className="grid size-10 place-items-center rounded-full text-wood-700 transition-colors hover:bg-wood-100 hover:text-forest-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
                 >
                   <Minus className="size-4" strokeWidth={2.2} />
@@ -157,7 +167,7 @@ export function ProductDetails({ product }: { product: Product }) {
                 <button
                   type="button"
                   onClick={() => setQty((q) => q + 1)}
-                  aria-label="Augmenter la quantité"
+                  aria-label={t("product.qty.inc")}
                   className="grid size-10 place-items-center rounded-full text-wood-700 transition-colors hover:bg-wood-100 hover:text-forest-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
                 >
                   <Plus className="size-4" strokeWidth={2.2} />
@@ -179,7 +189,7 @@ export function ProductDetails({ product }: { product: Product }) {
                   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40"
                 )}
               >
-                Commander maintenant
+                {t("product.buyNow")}
               </button>
               <button
                 type="button"
@@ -197,12 +207,12 @@ export function ProductDetails({ product }: { product: Product }) {
                 {added ? (
                   <>
                     <Check className="size-4" strokeWidth={2.4} />
-                    Ajouté
+                    {t("card.added")}
                   </>
                 ) : (
                   <>
                     <ShoppingBag className="size-4" strokeWidth={2} />
-                    Ajouter au panier
+                    {t("card.addToCart")}
                   </>
                 )}
               </button>
@@ -236,12 +246,12 @@ export function ProductDetails({ product }: { product: Product }) {
             {added ? (
               <>
                 <Check className="size-4" strokeWidth={2.4} />
-                Ajouté
+                {t("card.added")}
               </>
             ) : (
               <>
                 <ShoppingBag className="size-4" strokeWidth={2} />
-                Ajouter
+                {t("card.addShort")}
               </>
             )}
           </button>
@@ -256,7 +266,7 @@ export function ProductDetails({ product }: { product: Product }) {
               "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40"
             )}
           >
-            Commander
+            {t("card.order")}
           </button>
         </div>
       </div>
@@ -275,6 +285,7 @@ function ProductImageSlider({
   name: string;
   discount: number | null;
 }) {
+  const { t } = useLanguage();
   // Autoplay: continues after user interaction (timer resets), pauses
   // while the mouse is over the slider.
   const autoplay = React.useRef(
@@ -348,7 +359,7 @@ function ProductImageSlider({
             <button
               type="button"
               onClick={() => emblaApi?.scrollPrev()}
-              aria-label="Image précédente"
+              aria-label={t("product.image.prev")}
               className="absolute start-3 top-1/2 z-10 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-cream/85 text-forest-900 backdrop-blur transition-all hover:bg-cream hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
             >
               <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={2.2} />
@@ -356,7 +367,7 @@ function ProductImageSlider({
             <button
               type="button"
               onClick={() => emblaApi?.scrollNext()}
-              aria-label="Image suivante"
+              aria-label={t("product.image.next")}
               className="absolute end-3 top-1/2 z-10 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-cream/85 text-forest-900 backdrop-blur transition-all hover:bg-cream hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
             >
               <ChevronRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
@@ -374,7 +385,7 @@ function ProductImageSlider({
               key={i}
               type="button"
               onClick={() => emblaApi?.scrollTo(i)}
-              aria-label={`Voir l'image ${i + 1}`}
+              aria-label={t("product.image.view", { n: i + 1 })}
               aria-current={i === selected}
               className={cn(
                 "relative size-14 shrink-0 overflow-hidden rounded-md sm:size-16",
@@ -405,6 +416,7 @@ function ProductImageSlider({
        section (cf. best-sellers.tsx::ProductCard), minus the rank
        badge since these aren't ranked. ──────────────────────────── */
 function SimilarProducts({ currentSlug }: { currentSlug: string }) {
+  const { t } = useLanguage();
   const items = PRODUCTS.filter((p) => p.slug !== currentSlug).slice(0, 4);
   if (items.length === 0) return null;
 
@@ -415,13 +427,13 @@ function SimilarProducts({ currentSlug }: { currentSlug: string }) {
     >
       <header className="mb-8 md:mb-10">
         <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-tangerine-700">
-          Découvrir aussi
+          {t("product.similar.eyebrow")}
         </p>
         <h2
           id="similar-title"
           className="mt-2 font-display text-2xl font-bold leading-tight tracking-[-0.02em] text-forest-900 sm:text-3xl md:text-[2rem]"
         >
-          Produits similaires
+          {t("product.similar.title")}
         </h2>
       </header>
 
@@ -437,6 +449,9 @@ function SimilarProducts({ currentSlug }: { currentSlug: string }) {
 }
 
 function SimilarProductCard({ product }: { product: Product }) {
+  const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
   const pct = discountPercent(product.price, product.oldPrice);
 
   return (
@@ -469,18 +484,18 @@ function SimilarProductCard({ product }: { product: Product }) {
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         <h3 className="truncate font-display text-[14.5px] font-semibold leading-snug text-forest-900 sm:text-base">
-          {product.name}
+          {productName(product)}
         </h3>
         <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-wood-600">
           {product.brand}
         </p>
         <div className="mt-3 flex flex-col leading-tight">
           <span className="font-display text-lg font-bold tracking-tight text-tangerine-700 sm:text-xl">
-            {formatDA(product.price)}
+            {formatPrice(product.price)}
           </span>
           {product.oldPrice ? (
             <span className="mt-0.5 block font-mono text-[11px] text-wood-500 line-through">
-              {formatDA(product.oldPrice)}
+              {formatPrice(product.oldPrice)}
             </span>
           ) : null}
         </div>
@@ -489,7 +504,7 @@ function SimilarProductCard({ product }: { product: Product }) {
         <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
           <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
-            Commander
+            {t("card.order")}
           </span>
           <AddToCartButton product={product} />
         </div>

@@ -4,6 +4,7 @@ import * as React from "react";
 import { Check, ShoppingCart } from "lucide-react";
 
 import { useCart } from "@/lib/cart";
+import { useLanguage } from "@/lib/i18n";
 import type { Product } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ export function AddToCartButton({
   className?: string;
 }) {
   const { addItem } = useCart();
+  const { t } = useLanguage();
   const [added, setAdded] = React.useState(false);
   const timeoutRef = React.useRef<number | null>(null);
 
@@ -45,7 +47,7 @@ export function AddToCartButton({
     <button
       type="button"
       onClick={onClick}
-      aria-label={added ? "Ajouté au panier" : "Ajouter au panier"}
+      aria-label={added ? t("card.addedAria") : t("card.addToCart")}
       aria-pressed={added}
       className={cn(
         "inline-flex h-7 w-full items-center justify-center gap-2 rounded-2xl px-3 sm:h-9",
@@ -62,13 +64,13 @@ export function AddToCartButton({
       {added ? (
         <>
           <Check className="size-3" strokeWidth={2.6} />
-          <span>Ajouté</span>
+          <span>{t("card.added")}</span>
         </>
       ) : (
         <>
           <ShoppingCart className="size-3" strokeWidth={2.2} />
-          <span className="sm:hidden">Ajouter</span>
-          <span className="hidden sm:inline">Ajouter au panier</span>
+          <span className="sm:hidden">{t("card.addShort")}</span>
+          <span className="hidden sm:inline">{t("card.addToCart")}</span>
         </>
       )}
     </button>

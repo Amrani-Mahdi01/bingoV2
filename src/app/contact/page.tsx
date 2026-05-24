@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { WhatsappIcon } from "@/components/icons/social";
+import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -18,6 +19,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Errors = Partial<Record<"name" | "email" | "subject" | "message", string>>;
 
 export default function ContactPage() {
+  const { t } = useLanguage();
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [subject, setSubject] = React.useState("");
@@ -35,13 +37,12 @@ export default function ContactPage() {
 
   const validate = (): Errors => {
     const e: Errors = {};
-    if (!name.trim()) e.name = "Votre nom est requis.";
-    if (!email.trim()) e.email = "Votre email est requis.";
-    else if (!EMAIL_RE.test(email.trim())) e.email = "Email invalide.";
-    if (!subject.trim()) e.subject = "L'objet est requis.";
-    if (!message.trim()) e.message = "Le message est requis.";
-    else if (message.trim().length < 10)
-      e.message = "Votre message est un peu court (10 caractères minimum).";
+    if (!name.trim()) e.name = t("contact.error.name");
+    if (!email.trim()) e.email = t("contact.error.emailMissing");
+    else if (!EMAIL_RE.test(email.trim())) e.email = t("contact.error.emailInvalid");
+    if (!subject.trim()) e.subject = t("contact.error.subject");
+    if (!message.trim()) e.message = t("contact.error.messageMissing");
+    else if (message.trim().length < 10) e.message = t("contact.error.messageShort");
     return e;
   };
 
@@ -59,31 +60,29 @@ export default function ContactPage() {
       <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
         {/* Breadcrumb */}
         <nav
-          aria-label="Fil d'Ariane"
+          aria-label={t("breadcrumb.aria")}
           className="flex flex-wrap items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-700"
         >
           <Link href="/" className="transition-colors hover:text-tangerine-700">
-            Accueil
+            {t("breadcrumb.home")}
           </Link>
           <ChevronRight
             className="size-3 text-wood-500 rtl:rotate-180"
             strokeWidth={2.2}
           />
-          <span className="text-forest-900">Contact</span>
+          <span className="text-forest-900">{t("nav.contact")}</span>
         </nav>
 
         {/* Header */}
         <header className="mt-6 max-w-2xl md:mt-8">
           <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.28em] text-tangerine-700">
-            Une question
+            {t("contact.eyebrow")}
           </p>
-          <h1 className="mt-3 font-display text-[40px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 sm:text-[56px] md:text-[64px]">
-            Contactez-nous
+          <h1 className="mt-3 font-display text-[40px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 rtl:pb-2 rtl:leading-[1.25] sm:text-[56px] md:text-[64px]">
+            {t("contact.title")}
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-wood-700 sm:text-base">
-            Une question sur un produit, une commande ou un conseil
-            terrain ? Écrivez-nous — l&apos;équipe BINGO vous répond sous
-            24 h.
+            {t("contact.subtitle")}
           </p>
         </header>
 
@@ -108,11 +107,11 @@ export default function ContactPage() {
               className="rounded-2xl border border-wood-300/50 bg-cream-deep/30 p-5 sm:p-6"
             >
               <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-forest-900 sm:text-xl">
-                Écrivez-nous
+                {t("contact.form.title")}
               </h2>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Field id="contact-name" label="Nom" required error={errors.name}>
+                <Field id="contact-name" label={t("contact.form.name")} required error={errors.name}>
                   <input
                     id="contact-name"
                     type="text"
@@ -128,7 +127,7 @@ export default function ContactPage() {
                 </Field>
                 <Field
                   id="contact-email"
-                  label="Email"
+                  label={t("contact.form.email")}
                   required
                   error={errors.email}
                 >
@@ -142,13 +141,13 @@ export default function ContactPage() {
                       clearError("email");
                     }}
                     aria-invalid={!!errors.email}
-                    placeholder="vous@email.dz"
+                    placeholder={t("contact.form.emailPlaceholder")}
                     className={inputClass(!!errors.email)}
                   />
                 </Field>
                 <Field
                   id="contact-subject"
-                  label="Objet"
+                  label={t("contact.form.subject")}
                   required
                   error={errors.subject}
                   className="sm:col-span-2"
@@ -162,13 +161,13 @@ export default function ContactPage() {
                       clearError("subject");
                     }}
                     aria-invalid={!!errors.subject}
-                    placeholder="Question sur une commande, demande de conseil, …"
+                    placeholder={t("contact.form.subjectPlaceholder")}
                     className={inputClass(!!errors.subject)}
                   />
                 </Field>
                 <Field
                   id="contact-message"
-                  label="Message"
+                  label={t("contact.form.message")}
                   required
                   error={errors.message}
                   className="sm:col-span-2"
@@ -182,7 +181,7 @@ export default function ContactPage() {
                       clearError("message");
                     }}
                     aria-invalid={!!errors.message}
-                    placeholder="Détaillez votre demande…"
+                    placeholder={t("contact.form.messagePlaceholder")}
                     className={cn(
                       inputClass(!!errors.message),
                       "h-auto resize-y py-3 leading-relaxed"
@@ -201,7 +200,7 @@ export default function ContactPage() {
                   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40"
                 )}
               >
-                Envoyer le message
+                {t("contact.form.submit")}
                 <ArrowRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
               </button>
             </form>
@@ -212,36 +211,40 @@ export default function ContactPage() {
             <ContactCard
               accent="forest"
               icon={<Phone className="size-5" strokeWidth={1.8} />}
-              label="Par téléphone"
-              primary="+213 673 81 28 96"
-              note="Samedi — Jeudi · 9 h — 18 h"
+              label={t("contact.card.phone.label")}
+              primary={
+                <span dir="ltr" className="inline-block">
+                  +213 673 81 28 96
+                </span>
+              }
+              note={t("contact.card.phone.hours")}
               href="tel:+213673812896"
-              cta="Appeler"
+              cta={t("contact.card.phone.cta")}
             />
             <ContactCard
               accent="tangerine"
               icon={<WhatsappIcon className="size-5" />}
-              label="Sur WhatsApp"
-              primary="Discutons directement"
-              note="Réponse moyenne en moins de 2 h"
+              label={t("contact.card.whatsapp.label")}
+              primary={t("contact.card.whatsapp.primary")}
+              note={t("contact.card.whatsapp.note")}
               href="https://wa.me/213673812896"
-              cta="Ouvrir WhatsApp"
+              cta={t("contact.card.whatsapp.cta")}
               external
             />
             <ContactCard
               accent="cream"
               icon={<MapPin className="size-5" strokeWidth={1.8} />}
-              label="À la boutique"
+              label={t("contact.card.shop.label")}
               primary={
                 <>
-                  Cité Dallas, Bât. 3 (près de LG)
+                  {t("about.shop.address.line1")}
                   <br />
-                  19000 Sétif, Algérie
+                  {t("about.shop.address.line2")}
                 </>
               }
-              note="Samedi — Jeudi · 9 h — 18 h"
+              note={t("contact.card.phone.hours")}
               href="/a-propos#notre-histoire"
-              cta="Voir l'adresse"
+              cta={t("contact.card.shop.cta")}
             />
           </aside>
         </div>
@@ -399,24 +402,24 @@ function ContactCard({
 /* ───── Success state ──────────────────────────────────────────── */
 
 function SuccessCard({ onReset }: { onReset: () => void }) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-col items-center gap-4 rounded-2xl border border-forest-900/30 bg-forest-900 px-6 py-12 text-center text-cream md:py-16">
       <span className="inline-grid size-14 place-items-center rounded-full bg-cream text-forest-900">
         <Check className="size-7" strokeWidth={2.4} />
       </span>
       <h2 className="font-display text-2xl font-bold tracking-[-0.01em] sm:text-3xl">
-        Message envoyé, merci !
+        {t("contact.success.title")}
       </h2>
       <p className="mx-auto max-w-md text-sm leading-relaxed text-cream/80 sm:text-base">
-        Nous vous répondons sous 24 h ouvrées sur l&apos;email que vous
-        nous avez laissé.
+        {t("contact.success.subtitle")}
       </p>
       <button
         type="button"
         onClick={onReset}
         className="mt-2 inline-flex items-center gap-2 rounded-full bg-tangerine-500 px-5 py-2.5 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-cream transition-colors hover:bg-tangerine-600"
       >
-        Envoyer un autre message
+        {t("contact.success.reset")}
       </button>
     </div>
   );

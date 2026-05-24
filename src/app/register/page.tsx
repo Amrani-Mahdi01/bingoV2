@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Lock,
@@ -12,7 +13,11 @@ import {
   User,
 } from "lucide-react";
 
+import { ApiError, AUTH_ENABLED } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth";
+import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { AuthDisabledNotice } from "@/components/auth-disabled-notice";
 
 import {
   BrandPanel,
@@ -27,12 +32,23 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Errors = Partial<
   Record<
-    "firstName" | "lastName" | "email" | "password" | "confirm" | "terms",
+    | "firstName"
+    | "lastName"
+    | "email"
+    | "password"
+    | "confirm"
+    | "terms"
+    | "form",
     string
   >
 >;
 
 export default function RegisterPage() {
+  const { t } = useLanguage();
+  const { register } = useAuth();
+  const router = useRouter();
+
+  if (!AUTH_ENABLED) return <AuthDisabledNotice />;
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -41,6 +57,7 @@ export default function RegisterPage() {
   const [acceptedTerms, setAcceptedTerms] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
   const [errors, setErrors] = React.useState<Errors>({});
+  const [submitting, setSubmitting] = React.useState(false);
 
   const clearError = (k: keyof Errors) =>
     setErrors((p) => {
@@ -52,61 +69,83 @@ export default function RegisterPage() {
 
   const validate = (): Errors => {
     const e: Errors = {};
-    if (!firstName.trim()) e.firstName = "Votre prénom est requis.";
-    if (!lastName.trim()) e.lastName = "Votre nom est requis.";
-    if (!email.trim()) e.email = "Votre email est requis.";
-    else if (!EMAIL_RE.test(email.trim())) e.email = "Email invalide.";
-    if (!password) e.password = "Mot de passe requis.";
-    else if (password.length < 6) e.password = "6 caractères minimum.";
-    if (!confirm) e.confirm = "Veuillez confirmer le mot de passe.";
-    else if (confirm !== password)
-      e.confirm = "Les mots de passe ne correspondent pas.";
-    if (!acceptedTerms) e.terms = "Vous devez accepter les CGV.";
+    if (!firstName.trim()) e.firstName = t("register.error.firstName");
+    if (!lastName.trim()) e.lastName = t("register.error.lastName");
+    if (!email.trim()) e.email = t("register.error.emailMissing");
+    else if (!EMAIL_RE.test(email.trim())) e.email = t("register.error.emailInvalid");
+    if (!password) e.password = t("register.error.passwordMissing");
+    else if (password.length < 6) e.password = t("register.error.passwordShort");
+    if (!confirm) e.confirm = t("register.error.confirmMissing");
+    else if (confirm !== password) e.confirm = t("register.error.confirmMismatch");
+    if (!acceptedTerms) e.terms = t("register.error.terms");
     return e;
   };
 
-  const onSubmit = (ev: React.FormEvent) => {
+  const onSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     const next = validate();
     setErrors(next);
     if (Object.keys(next).length > 0) return;
-    // TODO: POST to auth endpoint
+    setSubmitting(true);
+    try {
+      await register({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        password,
+      });
+      router.push("/");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const fieldErrors: Errors = {};
+        if (err.errors?.first_name?.[0]) fieldErrors.firstName = err.errors.first_name[0];
+        if (err.errors?.last_name?.[0]) fieldErrors.lastName = err.errors.last_name[0];
+        if (err.errors?.email?.[0]) fieldErrors.email = err.errors.email[0];
+        if (err.errors?.password?.[0]) fieldErrors.password = err.errors.password[0];
+        if (Object.keys(fieldErrors).length === 0) fieldErrors.form = err.message;
+        setErrors(fieldErrors);
+      } else {
+        setErrors({ form: (err as Error).message });
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <main className="flex flex-1 flex-col lg:min-h-screen lg:flex-row">
       <BrandPanel
-        eyebrow="Rejoignez la base"
+        eyebrow={t("register.brand.eyebrow")}
         title={
           <>
-            Une équipe
+            {t("register.brand.title1")}
             <br />
-            d&apos;aventure.
+            {t("register.brand.title2")}
           </>
         }
-        lead="Un compte BINGO = des commandes plus rapides, vos favoris à portée de main, et nos guides terrain en avant-première."
+        lead={t("register.brand.lead")}
         bullets={[
-          { Icon: Sparkles, text: "Nouveautés en avant-première" },
-          { Icon: Truck, text: "Adresses sauvegardées, commande en un clic" },
-          { Icon: RotateCcw, text: "Retours sous 30 jours, garantis" },
+          { Icon: Sparkles, text: t("register.brand.bullet1") },
+          { Icon: Truck, text: t("register.brand.bullet2") },
+          { Icon: RotateCcw, text: t("register.brand.bullet3") },
         ]}
       />
 
       <FormPanel>
         <header className="text-center lg:text-start">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.28em] text-tangerine-700">
-            Nouveau client
+            {t("register.eyebrow")}
           </p>
           <h1 className="mt-2 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] text-forest-900 sm:text-4xl">
-            Créer un compte
+            {t("register.title")}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-wood-700">
-            Déjà un compte ?{" "}
+            {t("register.haveAccount")}{" "}
             <Link
               href="/login"
               className="font-semibold text-tangerine-700 underline-offset-4 hover:text-tangerine-600 hover:underline"
             >
-              Se connecter
+              {t("register.signIn")}
             </Link>
           </p>
         </header>
@@ -115,7 +154,7 @@ export default function RegisterPage() {
           <div className="grid grid-cols-2 gap-3">
             <Field
               id="reg-firstName"
-              label="Prénom"
+              label={t("register.firstName")}
               required
               error={errors.firstName}
             >
@@ -134,7 +173,7 @@ export default function RegisterPage() {
             </Field>
             <Field
               id="reg-lastName"
-              label="Nom"
+              label={t("register.lastName")}
               required
               error={errors.lastName}
             >
@@ -152,7 +191,7 @@ export default function RegisterPage() {
             </Field>
           </div>
 
-          <Field id="reg-email" label="Email" required error={errors.email}>
+          <Field id="reg-email" label={t("auth.email")} required error={errors.email}>
             <Input
               id="reg-email"
               type="email"
@@ -162,7 +201,7 @@ export default function RegisterPage() {
                 setEmail(e.target.value);
                 clearError("email");
               }}
-              placeholder="vous@email.dz"
+              placeholder={t("auth.emailPlaceholder")}
               icon={<Mail className="size-4" strokeWidth={2} />}
               invalid={!!errors.email}
             />
@@ -170,7 +209,7 @@ export default function RegisterPage() {
 
           <Field
             id="reg-password"
-            label="Mot de passe"
+            label={t("auth.password")}
             required
             error={errors.password}
           >
@@ -184,7 +223,7 @@ export default function RegisterPage() {
                 clearError("password");
                 clearError("confirm");
               }}
-              placeholder="6 caractères minimum"
+              placeholder={t("register.passwordPlaceholder")}
               icon={<Lock className="size-4" strokeWidth={2} />}
               invalid={!!errors.password}
               trailing={
@@ -198,7 +237,7 @@ export default function RegisterPage() {
 
           <Field
             id="reg-confirm"
-            label="Confirmation"
+            label={t("register.confirm")}
             required
             error={errors.confirm}
           >
@@ -211,7 +250,7 @@ export default function RegisterPage() {
                 setConfirm(e.target.value);
                 clearError("confirm");
               }}
-              placeholder="Retapez votre mot de passe"
+              placeholder={t("register.confirmPlaceholder")}
               icon={<Lock className="size-4" strokeWidth={2} />}
               invalid={!!errors.confirm}
             />
@@ -228,12 +267,12 @@ export default function RegisterPage() {
               hasError={!!errors.terms}
               label={
                 <>
-                  J&apos;accepte les{" "}
+                  {t("register.acceptTermsPrefix")}{" "}
                   <Link
                     href="/cgv"
                     className="font-semibold text-tangerine-700 hover:underline"
                   >
-                    conditions générales de vente
+                    {t("register.acceptTermsLink")}
                   </Link>
                   .
                 </>
@@ -253,17 +292,28 @@ export default function RegisterPage() {
             ) : null}
           </div>
 
+          {errors.form ? (
+            <p
+              role="alert"
+              className="rounded-md border border-red-600/30 bg-red-600/5 px-3 py-2 font-mono text-[11px] text-red-700"
+            >
+              {errors.form}
+            </p>
+          ) : null}
+
           <button
             type="submit"
+            disabled={submitting}
             className={cn(
               "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-tangerine-500 px-6 py-3.5",
               "font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-cream",
               "shadow-[0_10px_28px_-10px_rgba(234,108,29,0.55)]",
               "transition-all duration-200 hover:-translate-y-0.5 hover:bg-tangerine-600",
-              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40"
+              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40",
+              "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             )}
           >
-            Créer mon compte
+            {t("register.submit")}
             <ArrowRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
           </button>
         </form>
@@ -272,7 +322,7 @@ export default function RegisterPage() {
         <div className="mt-8 flex items-center gap-3">
           <span className="h-px flex-1 bg-wood-300/60" />
           <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-wood-500">
-            ou
+            {t("auth.divider")}
           </span>
           <span className="h-px flex-1 bg-wood-300/60" />
         </div>
@@ -281,7 +331,7 @@ export default function RegisterPage() {
           href="/catalogue"
           className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full border border-wood-300 bg-cream px-6 py-3 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-forest-900 transition-colors hover:border-forest-900 hover:bg-cream-deep"
         >
-          Continuer sans compte
+          {t("auth.guest")}
         </Link>
       </FormPanel>
     </main>

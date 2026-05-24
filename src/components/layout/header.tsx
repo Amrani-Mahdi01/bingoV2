@@ -3,13 +3,16 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   ArrowRight,
   Heart,
+  LogOut,
   MapPin,
   Menu,
   Minus,
   Mountain,
+  Package,
   Phone,
   Plus,
   Search,
@@ -25,16 +28,23 @@ import {
   InstagramIcon,
   WhatsappIcon,
 } from "@/components/icons/social";
+import { AUTH_ENABLED } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth";
 import {
   categoryHref,
   productHref,
   searchCatalogue,
   subCategoryHref,
 } from "@/lib/catalogue";
-import { formatDA, type Product } from "@/lib/products";
+import { type Product } from "@/lib/products";
 import { useCart, type CartItem } from "@/lib/cart";
 import { useFavorites } from "@/lib/favorites";
-import { useLanguage, type Language } from "@/lib/i18n";
+import {
+  useFormatPrice,
+  useLanguage,
+  useProductName,
+  type Language,
+} from "@/lib/i18n";
 
 /* Nav + strip items reference translation keys so they swap with the
    active language. The keys live in `src/lib/i18n.tsx`. */
@@ -54,6 +64,10 @@ const STRIP_KEYS = [
 ] as const;
 
 export function Header() {
+  const pathname = usePathname();
+  // Admin routes have their own chrome — don't render the customer
+  // header on top of them.
+  const isAdminRoute = pathname?.startsWith("/admin") ?? false;
   const { t } = useLanguage();
   const { count: favoritesCount } = useFavorites();
   const [scrolled, setScrolled] = React.useState(false);
@@ -66,6 +80,8 @@ export function Header() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  if (isAdminRoute) return null;
 
   return (
     <header className="sticky top-0 z-50 isolate w-full">
@@ -108,6 +124,7 @@ export function Header() {
             <li>
               <a
                 href="tel:+213673812896"
+                dir="ltr"
                 className="inline-flex items-center gap-1.5 transition-colors hover:text-tangerine-300"
               >
                 <Phone className="size-3" strokeWidth={2} />
@@ -117,7 +134,7 @@ export function Header() {
             <li className="hidden md:block">
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="size-3" strokeWidth={2} />
-                Cité Dallas, Bât. 3 · 19000 Sétif
+                {t("header.address")}
               </span>
             </li>
           </ul>
@@ -207,14 +224,15 @@ export function Header() {
                   <Link
                     href={item.href}
                     className={cn(
-                      "group/nav relative flex items-center whitespace-nowrap rounded-full px-1.5 py-1 font-display text-[10px] font-medium uppercase tracking-[0.02em] text-wood-800",
+                      // French/LTR: smaller default; Arabic/RTL: keep the larger sizes.
+                      "group/nav relative flex items-center whitespace-nowrap rounded-full px-1.5 py-1 font-display text-[10px] font-medium uppercase tracking-[0.02em] text-wood-800 rtl:text-[12px]",
                       "transition-[color,font-size,letter-spacing,padding] duration-300 ease-out",
-                      "xl:gap-1.5 xl:px-3.5 xl:py-2 xl:text-[13px] xl:tracking-[0.18em]",
+                      "xl:gap-1.5 xl:px-3.5 xl:py-2 xl:text-[13px] xl:tracking-[0.18em] xl:rtl:text-[15px]",
                       // When any input in the main bar is focused (i.e. the
                       // search is open), shrink nav links so the expanded
                       // search input doesn't push them around.
-                      "group-has-[input:focus]/bar:px-1 group-has-[input:focus]/bar:text-[9px] group-has-[input:focus]/bar:tracking-[0]",
-                      "xl:group-has-[input:focus]/bar:px-2.5 xl:group-has-[input:focus]/bar:text-[11px] xl:group-has-[input:focus]/bar:tracking-[0.1em]",
+                      "group-has-[input:focus]/bar:px-1 group-has-[input:focus]/bar:text-[9px] group-has-[input:focus]/bar:tracking-[0] rtl:group-has-[input:focus]/bar:text-[11px]",
+                      "xl:group-has-[input:focus]/bar:px-2.5 xl:group-has-[input:focus]/bar:text-[11px] xl:group-has-[input:focus]/bar:tracking-[0.1em] xl:rtl:group-has-[input:focus]/bar:text-[13px]",
                       "hover:text-forest-900"
                     )}
                   >
@@ -225,7 +243,7 @@ export function Header() {
                     {t(item.key)}
                     <span
                       aria-hidden
-                      className="pointer-events-none absolute inset-x-1.5 -bottom-0.5 h-[2px] origin-left scale-x-0 rounded-full bg-tangerine-500 transition-transform duration-500 ease-out group-hover/nav:scale-x-100 xl:inset-x-3.5"
+                      className="pointer-events-none absolute inset-x-1.5 -bottom-0.5 h-[2px] origin-left scale-x-0 rounded-full bg-tangerine-500 transition-transform duration-500 ease-out rtl:origin-right group-hover/nav:scale-x-100 xl:inset-x-3.5"
                     />
                   </Link>
                 </li>
@@ -250,7 +268,7 @@ export function Header() {
               href="/favoris"
               aria-label={
                 favoritesCount > 0
-                  ? `Favoris, ${favoritesCount} article${favoritesCount > 1 ? "s" : ""}`
+                  ? t("icon.wishlist.withCount", { n: favoritesCount })
                   : t("icon.wishlist")
               }
               className={cn(
@@ -279,19 +297,7 @@ export function Header() {
               ) : null}
             </Link>
 
-            <Link
-              href="/login"
-              aria-label={t("icon.account")}
-              className={cn(
-                "group/icon relative hidden size-10 place-items-center rounded-full text-wood-800 lg:grid",
-                "transition-[background-color,color,transform] duration-300",
-                "hover:bg-wood-100 hover:text-forest-900",
-                "active:scale-95 active:bg-tangerine-500/15",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
-              )}
-            >
-              <User className="size-[18px]" strokeWidth={1.8} />
-            </Link>
+            <AccountButton />
 
             {/* Mobile search trigger — opens the inline search panel
                 below the main bar. */}
@@ -362,29 +368,18 @@ function LanguageToggle({ className }: { className?: string }) {
     >
       {options.map((opt) => {
         const active = lang === opt.value;
-        // Arabic is disabled for now — translations / RTL polish aren't
-        // production-ready. The chip stays visible so users know it's
-        // coming, but the click is a no-op.
-        const disabled = opt.value === "ar";
         return (
           <button
             key={opt.value}
             type="button"
-            onClick={() => {
-              if (!disabled) setLang(opt.value);
-            }}
-            disabled={disabled}
+            onClick={() => setLang(opt.value)}
             aria-pressed={active}
-            aria-disabled={disabled}
-            title={disabled ? "Bientôt disponible" : undefined}
             className={cn(
               "h-full rounded-full px-2.5 font-mono text-[10.5px] font-medium uppercase tracking-[0.16em]",
               "transition-colors duration-300 ease-out",
-              disabled
-                ? "cursor-not-allowed text-wood-400"
-                : active
-                  ? "bg-forest-900 text-cream shadow-[0_2px_8px_-2px_rgba(31,58,30,0.4)]"
-                  : "text-wood-700 hover:text-forest-900"
+              active
+                ? "bg-forest-900 text-cream shadow-[0_2px_8px_-2px_rgba(31,58,30,0.4)]"
+                : "text-wood-700 hover:text-forest-900"
             )}
           >
             {opt.label}
@@ -414,6 +409,8 @@ function HeaderSearch({
   onSelect?: () => void;
 }) {
   const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
   const [query, setQuery] = React.useState("");
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -521,15 +518,13 @@ function HeaderSearch({
           <div className="flex items-center justify-between gap-2 border-b border-wood-300/40 bg-cream-deep/40 px-3 py-2">
             <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-wood-600">
               {hasResults
-                ? `${results.categories.length + results.subCategories.length + results.products.length} résultat${
-                    results.categories.length +
+                ? t("search.results.count", {
+                    n:
+                      results.categories.length +
                       results.subCategories.length +
-                      results.products.length >
-                    1
-                      ? "s"
-                      : ""
-                  }`
-                : "Aucun résultat"}
+                      results.products.length,
+                  })
+                : t("search.results.none")}
             </span>
             <span className="truncate font-mono text-[9.5px] text-tangerine-700">
               « {trimmedQuery} »
@@ -540,10 +535,10 @@ function HeaderSearch({
             {!hasResults ? (
               <div className="px-3 py-6 text-center">
                 <p className="font-display text-[13px] font-semibold text-forest-900">
-                  Rien trouvé
+                  {t("search.notFound.title")}
                 </p>
                 <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-wood-600">
-                  Essayez un autre mot-clé.
+                  {t("search.notFound.hint")}
                 </p>
               </div>
             ) : (
@@ -591,8 +586,8 @@ function HeaderSearch({
                       href={productHref(p.slug)}
                       onClick={close}
                       image={p.image}
-                      title={p.name}
-                      meta={`${p.brand} · ${formatDA(p.price)}`}
+                      title={productName(p)}
+                      meta={`${p.brand} · ${formatPrice(p.price)}`}
                     />
                   ))}
                 </SearchGroup>
@@ -708,6 +703,7 @@ function MobileMenu({
   onClose: () => void;
 }) {
   const { t } = useLanguage();
+  const { customer, logout } = useAuth();
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
@@ -750,9 +746,9 @@ function MobileMenu({
         aria-modal="true"
         aria-label={t("menu.dialog")}
         className={cn(
-          "absolute inset-y-0 end-0 flex w-[min(85vw,360px)] flex-col bg-cream shadow-[0_-8px_60px_-12px_rgba(31,58,30,0.4)]",
+          "absolute inset-y-0 start-0 flex w-[min(85vw,360px)] flex-col bg-cream shadow-[0_-8px_60px_-12px_rgba(31,58,30,0.4)]",
           "transition-transform duration-300 ease-out",
-          open ? "translate-x-0" : "translate-x-full rtl:-translate-x-full"
+          open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full"
         )}
       >
         <header className="flex items-center justify-between border-b border-wood-300/40 px-5 py-4">
@@ -831,17 +827,50 @@ function MobileMenu({
             <p className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.24em] text-tangerine-700">
               {t("menu.mySpace")}
             </p>
+            {AUTH_ENABLED && customer ? (
+              <div className="mb-2 flex items-center gap-3 rounded-xl bg-cream-deep/40 px-3 py-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-900 text-cream font-display text-sm font-bold">
+                  {(customer.firstName?.[0] ?? customer.email?.[0] ?? "?").toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-display text-[13px] font-semibold text-forest-900">
+                    {t("account.greeting", { name: customer.firstName })}
+                  </p>
+                  <p className="truncate font-mono text-[10px] text-wood-600">
+                    {customer.email}
+                  </p>
+                </div>
+              </div>
+            ) : null}
             <ul className="flex flex-col gap-1">
-              <li>
-                <Link
-                  href="/login"
-                  onClick={onClose}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-display text-[14px] text-wood-800 transition-colors hover:bg-cream-deep/70 hover:text-forest-900"
-                >
-                  <User className="size-[18px]" strokeWidth={1.8} />
-                  {t("menu.account")}
-                </Link>
-              </li>
+              {AUTH_ENABLED ? (
+                customer ? (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        void logout();
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start font-display text-[14px] text-tangerine-700 transition-colors hover:bg-cream-deep/70"
+                    >
+                      <LogOut className="size-[18px] rtl:rotate-180" strokeWidth={1.8} />
+                      {t("account.logout")}
+                    </button>
+                  </li>
+                ) : (
+                  <li>
+                    <Link
+                      href="/login"
+                      onClick={onClose}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-display text-[14px] text-wood-800 transition-colors hover:bg-cream-deep/70 hover:text-forest-900"
+                    >
+                      <User className="size-[18px]" strokeWidth={1.8} />
+                      {t("menu.account")}
+                    </Link>
+                  </li>
+                )
+              ) : null}
               <li>
                 <Link
                   href="/favoris"
@@ -869,6 +898,7 @@ function MobileMenu({
        and the drawer updates in lock-step. ───────────────────────── */
 function HeaderCart() {
   const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
   const { items, itemCount, subtotal, updateQty, removeItem } = useCart();
   const [open, setOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
@@ -912,15 +942,16 @@ function HeaderCart() {
         )}
       />
 
-      {/* Panel — slides in from the end (right LTR / left RTL) */}
+      {/* Panel — always slides in from the physical right edge,
+          regardless of language direction. */}
       <aside
         role="dialog"
         aria-modal="true"
         aria-label={t("cart.title")}
         className={cn(
-          "absolute inset-y-0 end-0 flex w-[min(92vw,420px)] flex-col bg-cream shadow-[0_-8px_60px_-12px_rgba(31,58,30,0.4)]",
+          "absolute inset-y-0 right-0 flex w-[min(92vw,420px)] flex-col bg-cream shadow-[0_-8px_60px_-12px_rgba(31,58,30,0.4)]",
           "transition-transform duration-300 ease-out",
-          open ? "translate-x-0" : "translate-x-full rtl:-translate-x-full"
+          open ? "translate-x-0" : "translate-x-full"
         )}
       >
         <header className="flex items-center justify-between border-b border-wood-300/40 bg-cream-deep/40 px-5 py-4">
@@ -1055,7 +1086,7 @@ function HeaderCart() {
                 {t("cart.subtotal")}
               </span>
               <span className="font-display text-[20px] font-bold tracking-[-0.01em] text-forest-900">
-                {formatDA(subtotal)}
+                {formatPrice(subtotal)}
               </span>
             </div>
             <div className="flex gap-2">
@@ -1091,7 +1122,11 @@ function HeaderCart() {
   return (
     <>
       <IconButton
-        aria-label={t("icon.cart")}
+        aria-label={
+          itemCount > 0
+            ? t("icon.cart.withCount", { n: itemCount })
+            : t("icon.cart")
+        }
         aria-expanded={open}
         aria-controls="header-cart-drawer"
         onClick={() => setOpen(true)}
@@ -1128,8 +1163,11 @@ function CartLine({
   onRemove: () => void;
 }) {
   const { t } = useLanguage();
+  const formatPrice = useFormatPrice();
+  const productName = useProductName();
   const { product, qty } = item;
   const lineTotal = product.price * qty;
+  const displayName = productName(product);
 
   return (
     <li className="flex gap-3 px-3 py-3">
@@ -1137,7 +1175,7 @@ function CartLine({
       <Link
         href={productHref(product.slug)}
         className="shrink-0"
-        aria-label={product.name}
+        aria-label={displayName}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -1153,12 +1191,14 @@ function CartLine({
       <div className="flex min-w-0 flex-1 flex-col">
         <Link
           href={productHref(product.slug)}
-          className="truncate font-display text-[13px] font-medium leading-tight text-forest-900 hover:text-tangerine-700"
+          className="truncate font-display text-[13px] font-medium leading-tight text-forest-900 hover:text-tangerine-700 rtl:mb-1 rtl:leading-[1.4]"
         >
-          {product.name}
+          {displayName}
         </Link>
         <span className="truncate font-mono text-[10px] uppercase tracking-[0.16em] text-wood-600">
-          {product.brand}
+          {product.categorySlug
+            ? t(`category.${product.categorySlug}`)
+            : product.brand}
         </span>
 
         {/* Qty stepper */}
@@ -1191,7 +1231,7 @@ function CartLine({
       {/* Trail: price + remove */}
       <div className="flex shrink-0 flex-col items-end justify-between">
         <span className="font-display text-[13px] font-semibold text-forest-900">
-          {formatDA(lineTotal)}
+          {formatPrice(lineTotal)}
         </span>
         <button
           type="button"
@@ -1203,6 +1243,130 @@ function CartLine({
         </button>
       </div>
     </li>
+  );
+}
+
+/* ─── Account button — User icon when logged out, initial-circle +
+       dropdown when logged in. Desktop only (lg+); the mobile menu has
+       its own equivalent (see MobileMenu). ─────────────────────────── */
+function AccountButton() {
+  const { t } = useLanguage();
+  const { customer, logout } = useAuth();
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  // Auth UI hidden until the backend is available — see AUTH_ENABLED
+  // in @/lib/api-client.
+  if (!AUTH_ENABLED) return null;
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (!customer) {
+    return (
+      <Link
+        href="/login"
+        aria-label={t("icon.account")}
+        className={cn(
+          "group/icon relative hidden size-10 place-items-center rounded-full text-wood-800 lg:grid",
+          "transition-[background-color,color,transform] duration-300",
+          "hover:bg-wood-100 hover:text-forest-900",
+          "active:scale-95 active:bg-tangerine-500/15",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
+        )}
+      >
+        <User className="size-[18px]" strokeWidth={1.8} />
+      </Link>
+    );
+  }
+
+  const initial = (customer.firstName?.[0] ?? customer.email?.[0] ?? "?").toUpperCase();
+  const fullName = `${customer.firstName} ${customer.lastName}`.trim();
+
+  return (
+    <div ref={ref} className="relative hidden lg:block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("account.menu.aria")}
+        className={cn(
+          "grid size-10 place-items-center rounded-full bg-forest-900 text-cream",
+          "font-display text-sm font-bold tracking-tight",
+          "transition-all duration-200 hover:bg-forest-700",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
+        )}
+      >
+        {initial}
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute end-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-wood-300/70 bg-cream shadow-[0_18px_40px_-14px_rgba(31,58,30,0.3)]"
+        >
+          {/* Greeting block */}
+          <div className="border-b border-wood-300/40 bg-cream-deep/30 px-4 py-3">
+            <p className="font-display text-[13px] font-semibold text-forest-900">
+              {t("account.greeting", { name: customer.firstName })}
+            </p>
+            <p className="mt-0.5 truncate font-mono text-[10.5px] text-wood-600">
+              {customer.email}
+            </p>
+          </div>
+
+          <ul className="py-1.5">
+            <li>
+              <Link
+                href="/favoris"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 px-3 py-2 font-display text-[13px] text-forest-900 transition-colors hover:bg-cream-deep/60"
+              >
+                <Heart className="size-4" strokeWidth={1.8} />
+                {t("icon.wishlist")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/commander"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 px-3 py-2 font-display text-[13px] text-forest-900 transition-colors hover:bg-cream-deep/60"
+              >
+                <Package className="size-4" strokeWidth={1.8} />
+                {t("account.orders")}
+              </Link>
+            </li>
+            <li className="my-1 border-t border-wood-300/40" />
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  void logout();
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-start font-display text-[13px] text-tangerine-700 transition-colors hover:bg-cream-deep/60"
+              >
+                <LogOut className="size-4 rtl:rotate-180" strokeWidth={1.8} />
+                {t("account.logout")}
+              </button>
+            </li>
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

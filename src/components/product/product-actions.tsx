@@ -4,6 +4,7 @@ import * as React from "react";
 import { Heart } from "lucide-react";
 
 import { useFavorites } from "@/lib/favorites";
+import { useLanguage } from "@/lib/i18n";
 import type { Product } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export function ProductActions({
   className?: string;
 }) {
   const { has, toggle } = useFavorites();
+  const { t } = useLanguage();
   const favorited = product ? has(product.slug) : false;
 
   const onFavorite = (e: React.MouseEvent) => {
@@ -41,7 +43,9 @@ export function ProductActions({
       <button
         type="button"
         onClick={onFavorite}
-        aria-label={favorited ? "Retirer des favoris" : "Ajouter aux favoris"}
+        aria-label={
+          favorited ? t("actions.favorite.remove") : t("actions.favorite.add")
+        }
         aria-pressed={favorited}
         className={cn(
           "grid size-8 place-items-center rounded-full bg-cream/95 shadow-sm backdrop-blur-sm",
