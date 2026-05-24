@@ -17,7 +17,6 @@ import { ApiError, AUTH_ENABLED } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { AuthDisabledNotice } from "@/components/auth-disabled-notice";
 
 import {
   BrandPanel,
@@ -44,11 +43,9 @@ type Errors = Partial<
 >;
 
 export default function RegisterPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { register } = useAuth();
   const router = useRouter();
-
-  if (!AUTH_ENABLED) return <AuthDisabledNotice />;
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -86,6 +83,17 @@ export default function RegisterPage() {
     const next = validate();
     setErrors(next);
     if (Object.keys(next).length > 0) return;
+
+    if (!AUTH_ENABLED) {
+      setErrors({
+        form:
+          lang === "ar"
+            ? "إنشاء الحسابات سيكون متاحاً قريباً."
+            : "La création de compte sera disponible prochainement.",
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       await register({

@@ -21,7 +21,6 @@ import { useAdminAuth } from "@/lib/admin-auth";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { AuthDisabledNotice } from "@/components/auth-disabled-notice";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -35,13 +34,10 @@ function isAdminEmail(email: string): boolean {
 type Errors = Partial<Record<"email" | "password" | "form", string>>;
 
 export default function LoginPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { login } = useAuth();
   const { login: adminLogin } = useAdminAuth();
   const router = useRouter();
-
-  // Auth flow is feature-gated until the backend is live in production.
-  if (!AUTH_ENABLED) return <AuthDisabledNotice />;
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -71,6 +67,20 @@ export default function LoginPage() {
     const next = validate();
     setErrors(next);
     if (Object.keys(next).length > 0) return;
+
+    // Auth is feature-gated off until the backend is live in production.
+    // Validate locally so the UI still feels responsive, then show a
+    // "coming soon" message instead of firing the API request.
+    if (!AUTH_ENABLED) {
+      setErrors({
+        form:
+          lang === "ar"
+            ? "تسجيل الحسابات سيكون متاحاً قريباً."
+            : "La connexion sera disponible prochainement.",
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const trimmed = email.trim();

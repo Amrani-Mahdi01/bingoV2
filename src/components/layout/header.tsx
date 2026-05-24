@@ -28,7 +28,6 @@ import {
   InstagramIcon,
   WhatsappIcon,
 } from "@/components/icons/social";
-import { AUTH_ENABLED } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import {
   categoryHref,
@@ -827,7 +826,7 @@ function MobileMenu({
             <p className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.24em] text-tangerine-700">
               {t("menu.mySpace")}
             </p>
-            {AUTH_ENABLED && customer ? (
+            {customer ? (
               <div className="mb-2 flex items-center gap-3 rounded-xl bg-cream-deep/40 px-3 py-3">
                 <span className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-900 text-cream font-display text-sm font-bold">
                   {(customer.firstName?.[0] ?? customer.email?.[0] ?? "?").toUpperCase()}
@@ -843,34 +842,32 @@ function MobileMenu({
               </div>
             ) : null}
             <ul className="flex flex-col gap-1">
-              {AUTH_ENABLED ? (
-                customer ? (
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        void logout();
-                      }}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start font-display text-[14px] text-tangerine-700 transition-colors hover:bg-cream-deep/70"
-                    >
-                      <LogOut className="size-[18px] rtl:rotate-180" strokeWidth={1.8} />
-                      {t("account.logout")}
-                    </button>
-                  </li>
-                ) : (
-                  <li>
-                    <Link
-                      href="/login"
-                      onClick={onClose}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-display text-[14px] text-wood-800 transition-colors hover:bg-cream-deep/70 hover:text-forest-900"
-                    >
-                      <User className="size-[18px]" strokeWidth={1.8} />
-                      {t("menu.account")}
-                    </Link>
-                  </li>
-                )
-              ) : null}
+              {customer ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      void logout();
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start font-display text-[14px] text-tangerine-700 transition-colors hover:bg-cream-deep/70"
+                  >
+                    <LogOut className="size-[18px] rtl:rotate-180" strokeWidth={1.8} />
+                    {t("account.logout")}
+                  </button>
+                </li>
+              ) : (
+                <li>
+                  <Link
+                    href="/login"
+                    onClick={onClose}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-display text-[14px] text-wood-800 transition-colors hover:bg-cream-deep/70 hover:text-forest-900"
+                  >
+                    <User className="size-[18px]" strokeWidth={1.8} />
+                    {t("menu.account")}
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link
                   href="/favoris"
@@ -1254,10 +1251,6 @@ function AccountButton() {
   const { customer, logout } = useAuth();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
-
-  // Auth UI hidden until the backend is available — see AUTH_ENABLED
-  // in @/lib/api-client.
-  if (!AUTH_ENABLED) return null;
 
   React.useEffect(() => {
     if (!open) return;
