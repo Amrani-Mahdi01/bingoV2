@@ -195,8 +195,11 @@ export function LogoManager() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-4">
-        <div className="relative flex h-24 w-64 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-zinc-50 p-3">
+      {/* Stack the preview above the controls on mobile so neither
+          column gets squeezed below its readable width. On sm+ we
+          revert to the side-by-side layout the original design used. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
+        <div className="relative flex h-24 w-full items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-zinc-50 p-3 sm:w-64 sm:shrink-0">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -212,7 +215,7 @@ export function LogoManager() {
           )}
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-1">
           <label
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
@@ -248,7 +251,15 @@ export function LogoManager() {
           ) : null}
 
           {logoUrl ? (
-            <p className="break-all font-mono text-2xs text-zinc-500">
+            // Single-line truncated URL with full value in the tooltip
+            // / title — avoids the ugly char-per-line wrap that
+            // `break-all` produces in a narrow column. The min-w-0 on
+            // the parent lets truncate actually shrink instead of
+            // overflowing its flex slot.
+            <p
+              className="block min-w-0 truncate font-mono text-2xs text-zinc-500"
+              title={logoUrl}
+            >
               {logoUrl}
             </p>
           ) : null}
@@ -333,7 +344,7 @@ export function LogoManager() {
                 {altFr || "BINGO"}
               </span>
             )}
-            <span className="ms-auto font-mono text-2xs text-zinc-500">
+            <span className="ms-auto hidden font-mono text-2xs text-zinc-500 sm:inline">
               {height}px · {maxWidth}px ·{" "}
               {radius >= RADIUS_RANGE.max ? "rond" : `${radius}px`}
             </span>

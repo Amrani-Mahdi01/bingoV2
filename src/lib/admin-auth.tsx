@@ -8,6 +8,7 @@ import {
   getAdminToken,
   setAdminToken,
 } from "@/lib/api-client";
+import { ADMIN_TOKEN_REFRESHED } from "@/lib/auth";
 
 export type Admin = {
   id: number;
@@ -99,6 +100,19 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       setAdmin(null);
     }
   }, []);
+
+  // The storefront customer login dispatches this event after dropping
+  // the admin token into localStorage (dual-identity payload). Listen
+  // so the sidebar/topbar light up without a page reload.
+  React.useEffect(() => {
+    const onAdminTokenRefreshed = () => {
+      void refresh();
+    };
+    window.addEventListener(ADMIN_TOKEN_REFRESHED, onAdminTokenRefreshed);
+    return () => {
+      window.removeEventListener(ADMIN_TOKEN_REFRESHED, onAdminTokenRefreshed);
+    };
+  }, [refresh]);
 
   const value = React.useMemo<Ctx>(
     () => ({ admin, loading, login, logout, refresh }),

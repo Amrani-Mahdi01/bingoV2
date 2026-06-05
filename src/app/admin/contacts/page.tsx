@@ -12,11 +12,10 @@ import {
   YouTubeIcon,
 } from "@/components/decorative/SocialIcons";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Mono, Small } from "@/components/ui/typography";
+import { Small } from "@/components/ui/typography";
 import { HttpError } from "@/lib/api/http";
 import { settingsApi, type SettingsMap } from "@/lib/api/settings";
 import {
@@ -29,17 +28,6 @@ import {
 } from "@/lib/site-contact";
 import { cn } from "@/lib/utils";
 
-const DAYS = [
-  { key: "sam", label: "Sam" },
-  { key: "dim", label: "Dim" },
-  { key: "lun", label: "Lun" },
-  { key: "mar", label: "Mar" },
-  { key: "mer", label: "Mer" },
-  { key: "jeu", label: "Jeu" },
-  { key: "ven", label: "Ven" },
-] as const;
-type DayKey = (typeof DAYS)[number]["key"];
-
 // Settings keys are flat and dotted, matching the project's existing
 // `site.*` / `contact.*` / `social.*` namespace convention.
 const K = {
@@ -48,26 +36,16 @@ const K = {
   whatsapp: "contact.whatsapp",
   addressFr: "contact.address.fr",
   addressAr: "contact.address.ar",
-  hours: (d: DayKey) => `contact.hours.${d}`,
-  hoursOff: (d: DayKey) => `contact.hours.${d}.off`,
+  mapsUrl: "contact.maps_url",
+  mapsPlaceFr: "contact.maps_place.fr",
+  mapsPlaceAr: "contact.maps_place.ar",
   social: {
     facebook: "social.facebook",
     instagram: "social.instagram",
     tiktok: "social.tiktok",
     youtube: "social.youtube",
-    whatsappBusiness: "social.whatsapp_business",
   },
 } as const;
-
-const DEFAULT_HOURS: Record<DayKey, string> = {
-  sam: "9h-18h",
-  dim: "9h-18h",
-  lun: "9h-18h",
-  mar: "9h-18h",
-  mer: "9h-18h",
-  jeu: "9h-18h",
-  ven: "14h-18h",
-};
 
 function extractMessage(err: unknown, fallback: string): string {
   if (err instanceof HttpError) {
@@ -90,15 +68,14 @@ export default function ContactsPage() {
   const [whatsapp, setWhatsapp] = React.useState(siteContact.whatsapp);
   const [addressFr, setAddressFr] = React.useState(siteContact.addressFr);
   const [addressAr, setAddressAr] = React.useState(siteContact.addressAr);
+  const [mapsUrl, setMapsUrl] = React.useState("");
+  const [mapsUrlError, setMapsUrlError] = React.useState<string | null>(null);
+  const [mapsPlaceFr, setMapsPlaceFr] = React.useState("");
+  const [mapsPlaceAr, setMapsPlaceAr] = React.useState("");
   const [facebook, setFacebook] = React.useState(siteContact.social.facebook);
   const [instagram, setInstagram] = React.useState(siteContact.social.instagram);
   const [tiktok, setTiktok] = React.useState(siteContact.social.tiktok);
   const [youtube, setYoutube] = React.useState(siteContact.social.youtube);
-  const [whatsappBusiness, setWhatsappBusiness] = React.useState(
-    siteContact.social.whatsappBusiness
-  );
-  const [hours, setHours] = React.useState<Record<DayKey, string>>(DEFAULT_HOURS);
-  const [offDays, setOffDays] = React.useState<Set<DayKey>>(new Set());
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -153,39 +130,35 @@ export default function ContactsPage() {
     setWhatsapp(pick(K.whatsapp, siteContact.whatsapp));
     setAddressFr(pick(K.addressFr, siteContact.addressFr));
     setAddressAr(pick(K.addressAr, siteContact.addressAr));
+    setMapsUrl(pick(K.mapsUrl, ""));
+    setMapsUrlError(null);
+    setMapsPlaceFr(pick(K.mapsPlaceFr, ""));
+    setMapsPlaceAr(pick(K.mapsPlaceAr, ""));
     setFacebook(pick(K.social.facebook, siteContact.social.facebook));
     setInstagram(pick(K.social.instagram, siteContact.social.instagram));
     setTiktok(pick(K.social.tiktok, siteContact.social.tiktok));
     setYoutube(pick(K.social.youtube, siteContact.social.youtube));
-    setWhatsappBusiness(
-      pick(K.social.whatsappBusiness, siteContact.social.whatsappBusiness)
-    );
-    const nextHours = { ...DEFAULT_HOURS };
-    const nextOff = new Set<DayKey>();
-    for (const { key } of DAYS) {
-      nextHours[key] = pick(K.hours(key), DEFAULT_HOURS[key]);
-      // off flag: prefer server, fall back to local
-      const serverOff = map[K.hoursOff(key)];
-      const localOff = local[K.hoursOff(key)];
-      const isOff = serverOff === "1" || (serverOff == null && localOff === "1");
-      if (isOff) nextOff.add(key);
-    }
-    setHours(nextHours);
-    setOffDays(nextOff);
   }
 
-  const toggleOff = (d: DayKey) =>
-    setOffDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(d)) next.delete(d);
-      else next.add(d);
-      return next;
-    });
-
-  const updateHours = (d: DayKey, v: string) =>
-    setHours((prev) => ({ ...prev, [d]: v }));
-
   const save = async () => {
+    // Cheap URL validation — must start with https:// (or http://) and
+    // look like a Google Maps host so a paste from the browser address
+    // bar is the only thing that passes.
+    const mapsTrimmed = mapsUrl.trim();
+    if (mapsTrimmed) {
+      const ok =
+        /^https?:\/\/(www\.|maps\.)?google\.[a-z.]+\/maps|^https?:\/\/(www\.|maps\.)?google\.[a-z.]+\/.*[?&]q=|^https?:\/\/maps\.app\.goo\.gl\/|^https?:\/\/goo\.gl\/maps\//i.test(
+          mapsTrimmed,
+        );
+      if (!ok) {
+        setMapsUrlError(
+          "Collez un lien Google Maps (google.com/maps/… ou maps.app.goo.gl/…).",
+        );
+        toast.error("Lien Google Maps invalide.");
+        return;
+      }
+    }
+    setMapsUrlError(null);
     setSaving(true);
     const payload: SettingsMap = {
       [K.phone]: phone.trim() || null,
@@ -193,16 +166,14 @@ export default function ContactsPage() {
       [K.whatsapp]: whatsapp.trim() || null,
       [K.addressFr]: addressFr.trim() || null,
       [K.addressAr]: addressAr.trim() || null,
+      [K.mapsUrl]: mapsTrimmed || null,
+      [K.mapsPlaceFr]: mapsPlaceFr.trim() || null,
+      [K.mapsPlaceAr]: mapsPlaceAr.trim() || null,
       [K.social.facebook]: facebook.trim() || null,
       [K.social.instagram]: instagram.trim() || null,
       [K.social.tiktok]: tiktok.trim() || null,
       [K.social.youtube]: youtube.trim() || null,
-      [K.social.whatsappBusiness]: whatsappBusiness.trim() || null,
     };
-    for (const { key } of DAYS) {
-      payload[K.hours(key)] = hours[key].trim() || null;
-      payload[K.hoursOff(key)] = offDays.has(key) ? "1" : null;
-    }
     // Mirror to localStorage first so the edit is guaranteed to persist
     // on this device, regardless of whether the server allow-list accepts
     // these keys yet.
@@ -237,7 +208,7 @@ export default function ContactsPage() {
       <AdminPageHeader
         eyebrow="Configuration"
         title="Coordonnées & réseaux"
-        subtitle="Téléphone, email, WhatsApp, adresse, horaires et liens sociaux. Source unique pour le footer et la page contact."
+        subtitle="Téléphone, email, WhatsApp, adresse et liens sociaux. Source unique pour le footer et la page contact."
       />
 
       {error ? (
@@ -253,14 +224,17 @@ export default function ContactsPage() {
         }}
         className="space-y-6 pb-32"
       >
-        {/* 1. Direct channels */}
-        <Section title="Canaux directs">
-          <Small className="-mt-3 mb-4 block text-zinc-500">
-            Affichés dans le footer et la page contact comme liens cliquables
+        {/* 1. Direct channels + social networks */}
+        <Section title="Canaux directs & réseaux sociaux">
+          <Small className="-mt-3 mb-5 block text-zinc-500">
+            Canaux directs : liens cliquables dans le footer et la page contact
             (<code className="font-mono text-2xs">tel:</code>,{" "}
             <code className="font-mono text-2xs">mailto:</code>,{" "}
-            <code className="font-mono text-2xs">wa.me/…</code>).
+            <code className="font-mono text-2xs">wa.me/…</code>). Réseaux
+            sociaux : laissez vide pour masquer le lien.
           </Small>
+
+          <SubHeading>Canaux directs</SubHeading>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="phone" label="Téléphone">
               <LinkedInput
@@ -297,72 +271,8 @@ export default function ContactsPage() {
               />
             </Field>
           </div>
-        </Section>
 
-        {/* 2. Address — bilingual */}
-        <Section title="Adresse">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field id="addr-fr" label="Adresse (FR)">
-              <Textarea
-                id="addr-fr"
-                rows={2}
-                value={addressFr}
-                onChange={(e) => setAddressFr(e.target.value)}
-                disabled={loading || saving}
-              />
-            </Field>
-            <Field id="addr-ar" label="العنوان (AR)">
-              <Textarea
-                id="addr-ar"
-                rows={2}
-                value={addressAr}
-                onChange={(e) => setAddressAr(e.target.value)}
-                disabled={loading || saving}
-                dir="rtl"
-                lang="ar"
-              />
-            </Field>
-          </div>
-        </Section>
-
-        {/* 3. Hours */}
-        <Section title="Horaires d'ouverture">
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {DAYS.map(({ key, label }) => {
-              const isOff = offDays.has(key);
-              return (
-                <li
-                  key={key}
-                  className="flex items-center gap-3 rounded-md bg-white px-3 py-2"
-                >
-                  <span className="w-12 font-mono text-xs">{label}</span>
-                  <Input
-                    value={hours[key]}
-                    onChange={(e) => updateHours(key, e.target.value)}
-                    disabled={isOff || loading || saving}
-                    placeholder={isOff ? "Fermé" : undefined}
-                    className={cn("h-8 flex-1", isOff && "text-zinc-400")}
-                    aria-label={`Horaires ${label}`}
-                  />
-                  <label className="flex shrink-0 items-center gap-1.5 text-xs text-zinc-600">
-                    <Checkbox
-                      checked={isOff}
-                      onCheckedChange={() => toggleOff(key)}
-                      disabled={loading || saving}
-                    />
-                    Fermé
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </Section>
-
-        {/* 4. Social */}
-        <Section title="Réseaux sociaux">
-          <Small className="-mt-3 mb-4 block text-zinc-500">
-            Laissez vide pour masquer le lien sur le site.
-          </Small>
+          <SubHeading className="mt-6">Réseaux sociaux</SubHeading>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="sn-fb" label="Facebook">
               <LinkedInput
@@ -408,20 +318,116 @@ export default function ContactsPage() {
                 disabled={loading || saving}
               />
             </Field>
-            <Field id="sn-wab" label="WhatsApp Business" className="sm:col-span-2">
-              <LinkedInput
-                id="sn-wab"
-                value={whatsappBusiness}
-                onChange={setWhatsappBusiness}
-                href={waHref(whatsappBusiness)}
-                actionLabel="Ouvrir WhatsApp Business"
-                icon={<MessageCircle className="size-3.5" />}
+          </div>
+        </Section>
+
+        {/* 2. Address — bilingual + Google Maps URL */}
+        <Section title="Adresse">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field id="addr-fr" label="Adresse (FR)">
+              <Textarea
+                id="addr-fr"
+                rows={2}
+                value={addressFr}
+                onChange={(e) => setAddressFr(e.target.value)}
                 disabled={loading || saving}
               />
-              <Mono className="mt-1 block text-2xs text-zinc-500">
-                Numéro distinct du WhatsApp principal si besoin.
-              </Mono>
             </Field>
+            <Field id="addr-ar" label="العنوان (AR)">
+              <Textarea
+                id="addr-ar"
+                rows={2}
+                value={addressAr}
+                onChange={(e) => setAddressAr(e.target.value)}
+                disabled={loading || saving}
+                dir="rtl"
+                lang="ar"
+              />
+            </Field>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <Field id="maps-url" label="Lien Google Maps">
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
+                <Input
+                  id="maps-url"
+                  value={mapsUrl}
+                  onChange={(e) => {
+                    setMapsUrl(e.target.value);
+                    if (mapsUrlError) setMapsUrlError(null);
+                  }}
+                  placeholder="https://www.google.com/maps/place/…"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  disabled={loading || saving}
+                  aria-invalid={!!mapsUrlError}
+                  className={cn(
+                    "flex-1 font-mono text-xs",
+                    mapsUrlError && "border-red-500 ring-2 ring-red-500/20",
+                  )}
+                />
+                {mapsUrl.trim() && !mapsUrlError ? (
+                  <a
+                    href={mapsUrl.trim()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "shrink-0",
+                    )}
+                  >
+                    Tester
+                  </a>
+                ) : null}
+              </div>
+              {mapsUrlError ? (
+                <p
+                  role="alert"
+                  className="mt-1 flex items-center gap-1 text-2xs font-medium text-red-600"
+                >
+                  <span
+                    aria-hidden
+                    className="inline-block size-1 rounded-full bg-red-600"
+                  />
+                  {mapsUrlError}
+                </p>
+              ) : (
+                <Small className="mt-1 block text-zinc-500">
+                  Sur Google Maps, ouvrez votre fiche → « Partager » →
+                  « Copier le lien », puis collez ici.
+                </Small>
+              )}
+            </Field>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field id="maps-place-fr" label="Nom du lieu (FR)">
+                <Input
+                  id="maps-place-fr"
+                  value={mapsPlaceFr}
+                  onChange={(e) => setMapsPlaceFr(e.target.value)}
+                  placeholder="Bingo Camping, Sétif"
+                  autoComplete="off"
+                  disabled={loading || saving}
+                />
+              </Field>
+              <Field id="maps-place-ar" label="اسم المكان (AR)">
+                <Input
+                  id="maps-place-ar"
+                  value={mapsPlaceAr}
+                  onChange={(e) => setMapsPlaceAr(e.target.value)}
+                  placeholder="بينغو كامبينغ، سطيف"
+                  autoComplete="off"
+                  disabled={loading || saving}
+                  dir="rtl"
+                  lang="ar"
+                />
+              </Field>
+            </div>
+            <Small className="block text-zinc-500">
+              Court libellé affiché à côté du lien (ex. nom du magasin
+              ou repère visible sur la carte). Bilingue FR / AR.
+            </Small>
           </div>
         </Section>
 
@@ -468,6 +474,25 @@ function Section({
       <h2 className="font-sans text-lg font-semibold text-zinc-900">{title}</h2>
       <div className="mt-5">{children}</div>
     </section>
+  );
+}
+
+function SubHeading({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <h3
+      className={cn(
+        "mb-3 border-b border-zinc-200 pb-1.5 font-sans text-2xs font-semibold uppercase tracking-wider text-zinc-500",
+        className,
+      )}
+    >
+      {children}
+    </h3>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { useLanguage } from "@/lib/i18n";

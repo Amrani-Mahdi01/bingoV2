@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
+import { useLocalizedRouter } from "@/components/ui/locale-link";
 import {
   ArrowRight,
   ChevronRight,
@@ -12,27 +13,34 @@ import {
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
+import { useAuth } from "@/lib/auth";
 import { useFavorites } from "@/lib/favorites";
 import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
-import {
-  discountPercent,
-  PRODUCTS,
-  type Product,
-} from "@/lib/products";
+import { discountPercent, type Product } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
 export default function FavorisPage() {
   const { t } = useLanguage();
-  const { slugs, clear } = useFavorites();
+  // Read pre-resolved items straight from the provider — it pulls full
+  // product rows from /api/auth/favorites once the customer is logged
+  // in. Anonymous users get bounced to /login below, so the local-only
+  // path in the provider is never relied on by this page.
+  const { items, clear } = useFavorites();
+  const { customer, loading: authLoading } = useAuth();
+  const router = useLocalizedRouter();
 
-  // Map slugs → Product objects, dropping any that no longer exist.
-  const items = React.useMemo<Product[]>(
-    () =>
-      slugs
-        .map((s) => PRODUCTS.find((p) => p.slug === s))
-        .filter((p): p is Product => Boolean(p)),
-    [slugs]
-  );
+  // Favorites are a logged-in-only feature: bounce anonymous visitors
+  // to /login with a `next` param so they return here after auth.
+  React.useEffect(() => {
+    if (authLoading) return;
+    if (!customer) {
+      router.replace(`/login?next=${encodeURIComponent("/favoris")}`);
+    }
+  }, [customer, authLoading, router]);
+
+  // Don't flash the empty-state UI while the auth check is still in
+  // flight or the redirect hasn't happened yet.
+  if (authLoading || !customer) return null;
 
   return (
     <main className="flex flex-1 flex-col bg-cream py-10 md:py-14">
@@ -152,8 +160,8 @@ function FavoriteCard({ product }: { product: Product }) {
           ) : null}
         </div>
 
-        <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
-          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
+        <div className="mt-auto flex flex-col gap-2 pt-3 sm:flex-row sm:pt-4">
+          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:flex-1 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
             {t("card.order")}
           </span>

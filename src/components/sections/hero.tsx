@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
 import { ArrowDown, ArrowRight } from "lucide-react";
 
 import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
-import { PRODUCTS, type Product } from "@/lib/products";
-import { productHref } from "@/lib/catalogue";
+import { useSiteHome } from "@/lib/site-home-context";
+import type { HeroSlot } from "@/lib/site-home";
 
 /**
  * BINGO hero — animated tipi camp, BINGO wordmark centered, scroll cue.
@@ -23,18 +23,13 @@ import { productHref } from "@/lib/catalogue";
  */
 export function Hero() {
   const { t, lang } = useLanguage();
+  const home = useSiteHome();
   const [mounted, setMounted] = React.useState(false);
 
-  // Default pile order (also what renders on SSR — same on server + first
-  // client paint, so no hydration mismatch). Replaced with a shuffled
-  // selection in the effect below, before the pile animation triggers.
-  const [pilePicks, setPilePicks] = React.useState<{
-    left: Product[];
-    right: Product[];
-  }>(() => ({
-    left: [PRODUCTS[0], PRODUCTS[2], PRODUCTS[4]],
-    right: [PRODUCTS[1], PRODUCTS[5], PRODUCTS[3]],
-  }));
+  // Hero piles render every slot the admin filled in /admin/banners —
+  // products AND categories. Empty / missing-target slots are dropped
+  // upstream. With 0 picks the pile block is omitted entirely.
+  const adminPicks = home.featuredSlots;
 
   React.useEffect(() => {
     const id1 = window.requestAnimationFrame(() => {
@@ -44,17 +39,14 @@ export function Hero() {
     return () => window.cancelAnimationFrame(id1);
   }, []);
 
-  // Reshuffle on every mount (Fisher–Yates) so the homepage feels fresh
-  // each visit. Runs before the pile animation kicks in at 2.1s.
-  React.useEffect(() => {
-    const a = [...PRODUCTS];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    const six = a.slice(0, 6);
-    setPilePicks({ left: six.slice(0, 3), right: six.slice(3, 6) });
-  }, []);
+  // Promo block — admin copy wins per field; i18n fallback when empty.
+  const promoSlogan =
+    (lang === "ar" ? home.promo.titleAr : home.promo.titleFr) ||
+    t("hero.promo.slogan");
+  const promoCta =
+    (lang === "ar" ? home.promo.ctaAr : home.promo.ctaFr) ||
+    t("hero.promo.cta");
+  const promoLink = home.promo.link || "/catalogue?promo=1";
 
   // Arabic script is connected — splitting per-letter would render
   // each glyph in its isolated form (no joining). For AR we render the
@@ -212,28 +204,34 @@ export function Hero() {
           to   { opacity: 1; transform: translateY(0);    }
         }
 
-        /* ──────────── IMAGE PILES — one image at a time
-              Each thumb slides in from its respective edge with its own
-              animation-delay (passed inline via style). The rotation is
-              held in a --rot CSS variable so the keyframe can sweep
-              from translateX(+/-220%) rotate(0) -> translateX(0) rotate(var(--rot)). */
-        .hero-pile-img {
+        /* ──────────── PRODUCT DECK — one fanned row that shuffles.
+              Every card keeps a stable DOM node and is absolutely
+              positioned; its slot (horizontal offset --tx + rotation
+              --rot + z-index) is fed in via inline style. The transform
+              transition below animates whenever the shuffle reassigns a
+              card's slot, so a card visibly slides from a right slot to
+              a left one (and vice-versa). The entrance keyframe takes
+              over during its 600 ms run, then this transition governs. */
+        .hero-deck-card {
           will-change: transform, opacity;
-          transform: rotate(var(--rot, 0deg));
+          transform: translateX(var(--tx, -50%)) rotate(var(--rot, 0deg));
+          transition:
+            transform 900ms cubic-bezier(0.34, 1.25, 0.64, 1),
+            box-shadow 300ms ease;
         }
-        .hero-mounted .hero-pile-img-left {
-          animation: hero-pile-img-left-in 600ms cubic-bezier(0.34,1.25,0.64,1) backwards;
+        .hero-mounted .hero-deck-card-left {
+          animation: hero-deck-in-left 600ms cubic-bezier(0.34,1.25,0.64,1) backwards;
         }
-        .hero-mounted .hero-pile-img-right {
-          animation: hero-pile-img-right-in 600ms cubic-bezier(0.34,1.25,0.64,1) backwards;
+        .hero-mounted .hero-deck-card-right {
+          animation: hero-deck-in-right 600ms cubic-bezier(0.34,1.25,0.64,1) backwards;
         }
-        @keyframes hero-pile-img-left-in {
-          from { opacity: 0; transform: translateX(-220%) rotate(0deg); }
-          to   { opacity: 1; transform: translateX(0)     rotate(var(--rot, 0deg)); }
+        @keyframes hero-deck-in-left {
+          from { opacity: 0; transform: translateX(calc(var(--tx, -50%) - 220%)) rotate(0deg); }
+          to   { opacity: 1; transform: translateX(var(--tx, -50%))               rotate(var(--rot, 0deg)); }
         }
-        @keyframes hero-pile-img-right-in {
-          from { opacity: 0; transform: translateX(220%) rotate(0deg); }
-          to   { opacity: 1; transform: translateX(0)    rotate(var(--rot, 0deg)); }
+        @keyframes hero-deck-in-right {
+          from { opacity: 0; transform: translateX(calc(var(--tx, -50%) + 220%)) rotate(0deg); }
+          to   { opacity: 1; transform: translateX(var(--tx, -50%))               rotate(var(--rot, 0deg)); }
         }
 
         /* ──────────── PROMO BLOCK — eyebrow + slogan + CTA.
@@ -350,33 +348,27 @@ export function Hero() {
           {t("hero.tagline")}
         </p>
 
-        {/* Image piles — each thumb slides in one-by-one, alternating
-            between left and right (left fires 100ms before right). */}
-        <div className="mt-10 flex items-center justify-center gap-7 sm:mt-28 sm:gap-14">
-          <HeroPile
-            side="left"
-            products={pilePicks.left}
-            baseDelay={2100}
-            stagger={220}
-          />
-          <HeroPile
-            side="right"
-            products={pilePicks.right}
-            baseDelay={2200}
-            stagger={220}
-          />
-        </div>
+        {/* Image piles — only render when the admin has picked at
+            least one product in /admin/banners. Empty configuration =
+            no pile block, hero collapses to wordmark + promo. */}
+        {adminPicks.length > 0 ? (
+          <div className="mt-10 flex items-center justify-center sm:mt-28">
+            <HeroDeck products={adminPicks} baseDelay={2100} stagger={220} />
+          </div>
+        ) : null}
 
-        {/* Promo block — eyebrow + slogan + CTA. */}
+        {/* Promo block — eyebrow + slogan + CTA. Slogan/CTA/link all
+            come from /admin/banners settings, falling back to the
+            i18n defaults when the admin hasn't customized them. */}
         <div className="hero-promo mt-20 flex flex-col items-center gap-3 sm:mt-20 sm:gap-3.5">
           <p className="font-mono text-[10px] uppercase tracking-[0.26em] text-tangerine-700">
             {t("hero.promo.eyebrow")}
           </p>
           <p className="max-w-md font-display text-base font-semibold leading-[1.2] tracking-[-0.01em] text-forest-900 sm:text-lg md:text-xl">
-            {t("hero.promo.slogan")}
+            {promoSlogan}
           </p>
           <Link
-            href="/catalogue?promo=1"
+            href={promoLink}
             className={[
               "mt-1 inline-flex items-center gap-1.5 rounded-full bg-tangerine-500 px-5 py-2",
               "font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-cream",
@@ -386,7 +378,7 @@ export function Hero() {
               "sm:px-6 sm:py-2.5 sm:text-[12px]",
             ].join(" ")}
           >
-            {t("hero.promo.cta")}
+            {promoCta}
             <ArrowRight className="size-3.5 rtl:rotate-180" strokeWidth={2.2} />
           </Link>
         </div>
@@ -405,67 +397,172 @@ export function Hero() {
   );
 }
 
-/* ─── Hero image pile — fan of 3 product thumbs, rotated and slightly
-       overlapped. Each thumb animates in individually, back-to-front,
-       via its own animation-delay so the stack assembles one by one. ── */
-function HeroPile({
-  side,
+/* ─── Hero product deck — a single fanned row of thumbs that shuffles.
+       Every card keeps a stable DOM node and is absolutely positioned;
+       its slot (horizontal offset + rotation + stacking) lives in inline
+       CSS vars. A transform transition (see the <style> block) animates
+       whenever the shuffle swaps two slots, so a card from the right
+       visibly slides over to a left slot — and vice-versa — every 2 s.
+       Each thumb still flies in back-to-front on first paint. ───────── */
+function HeroDeck({
   products,
   baseDelay = 2100,
   stagger = 220,
 }: {
-  side: "left" | "right";
-  products: Product[];
+  products: HeroSlot[];
   baseDelay?: number;
   stagger?: number;
 }) {
+  const { lang } = useLanguage();
   const formatPrice = useFormatPrice();
   const productName = useProductName();
-  const isLeft = side === "left";
+  const total = products.length;
+  const center = (total - 1) / 2;
+
+  // slotOfCard[cardIndex] = the slot that card currently occupies.
+  // Starts as identity (card i in slot i); the shuffle swaps entries so
+  // the DOM never reorders — only each card's inline transform changes.
+  const [slotOfCard, setSlotOfCard] = React.useState<number[]>(() =>
+    products.map((_, i) => i)
+  );
+
+  // Re-sync if the admin changes the number of picks at runtime.
+  React.useEffect(() => {
+    setSlotOfCard(products.map((_, i) => i));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total]);
+
+  /* ─── Shuffle every 2 s ──────────────────────────────────────────
+     Each tick picks one card sitting in a left-half slot and one in a
+     right-half slot and swaps them, so a swap always crosses the centre
+     — what reads as "a right card trading places with a left one." The
+     pair is chosen at random. Starts after the entrance cascade has
+     settled and pauses while the tab is hidden. */
+  React.useEffect(() => {
+    if (total < 2) return;
+    let intervalId: number | undefined;
+    const timeoutId = window.setTimeout(() => {
+      intervalId = window.setInterval(() => {
+        if (document.visibilityState !== "visible") return;
+        setSlotOfCard((prev) => {
+          const cardInSlot: number[] = [];
+          prev.forEach((slot, card) => {
+            cardInSlot[slot] = card;
+          });
+          const leftSlots: number[] = [];
+          const rightSlots: number[] = [];
+          for (let s = 0; s < total; s++) {
+            if (s < center) leftSlots.push(s);
+            else if (s > center) rightSlots.push(s);
+          }
+          if (leftSlots.length === 0 || rightSlots.length === 0) return prev;
+          const ls = leftSlots[Math.floor(Math.random() * leftSlots.length)];
+          const rs = rightSlots[Math.floor(Math.random() * rightSlots.length)];
+          const next = prev.slice();
+          next[cardInSlot[ls]] = rs;
+          next[cardInSlot[rs]] = ls;
+          return next;
+        });
+      }, 2000);
+    }, baseDelay + total * stagger + 600);
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+    };
+  }, [total, center, baseDelay, stagger]);
+
+  const STEP = 60; // slot spacing within a group, as a % of a card's width
+  const TILT = 5; //  degrees of fan per slot away from the centre
+  const GAP = 38; //  extra split between the left & right groups, % of width
+
   return (
-    <div className="relative flex shrink-0">
+    <div className="relative h-32 w-32 sm:h-36 sm:w-36 md:h-40 md:w-40">
       {products.map((p, i) => {
-        // Rotation: deepest at the back, near-flat at the front.
-        // Left pile rotates negative, right pile positive.
-        const angle = (isLeft ? -1 : 1) * (10 - i * 4);
-        // Back of the pile (largest i) appears first; front lands last.
-        const order = products.length - 1 - i;
+        const slot = slotOfCard[i] ?? i;
+        const rel = slot - center; // <0 left group, >0 right group
+        const side = rel < 0 ? -1 : rel > 0 ? 1 : 0;
+        // Group spacing + a centre gap that pushes the two groups apart,
+        // so it reads as "three on the left, three on the right." A card
+        // swapping sides slides the full width incl. this gap.
+        const tx = rel * STEP + side * GAP; // horizontal offset, % of width
+        const angle = rel * TILT; //          fan rotation, flat-ish near the gap
+        // Centre card sits on top; cards fan back toward the edges.
+        const zIndex = Math.round((total - Math.abs(rel)) * 10);
+        // Entrance: cards resting left of centre fly in from the left
+        // edge, the rest from the right. Back-to-front cascade by index.
+        const entranceLeft = i <= center;
+        const order = total - 1 - i;
         const delay = baseDelay + order * stagger;
+        const displayName = productName({
+          name: p.nameFr,
+          nameAr: p.nameAr,
+        });
+        // Product cards keep the price pill; category cards show the
+        // category name in the same pill so the slot reads cleanly.
+        const badgeText =
+          p.kind === "product" && p.price != null
+            ? formatPrice(p.price)
+            : lang === "ar" && p.nameAr
+              ? p.nameAr
+              : p.nameFr;
         return (
           <Link
-            key={p.slug}
-            href={productHref(p.slug)}
-            aria-label={productName(p)}
+            key={`${p.kind}-${p.slug}`}
+            href={p.href}
+            aria-label={displayName}
             className={[
-              "hero-pile-img",
-              isLeft ? "hero-pile-img-left" : "hero-pile-img-right",
-              "relative size-32 shrink-0 overflow-hidden rounded-xl ring-2 ring-cream shadow-[0_14px_30px_-8px_rgba(31,58,30,0.45)] sm:size-36 md:size-40",
-              "transition-shadow duration-300 hover:shadow-[0_18px_36px_-10px_rgba(31,58,30,0.55)]",
+              "hero-deck-card",
+              entranceLeft ? "hero-deck-card-left" : "hero-deck-card-right",
+              // White card so transparent / icon-style category images
+              // sit on a clean canvas instead of the page background.
+              "absolute left-1/2 top-0 size-32 overflow-hidden rounded-xl bg-white ring-2 ring-cream shadow-[0_14px_30px_-8px_rgba(31,58,30,0.45)] sm:size-36 md:size-40",
+              "hover:shadow-[0_18px_36px_-10px_rgba(31,58,30,0.55)]",
               "focus-visible:outline-none focus-visible:ring-tangerine-400",
             ].join(" ")}
             style={{
-              marginLeft: i === 0 ? 0 : -50,
-              zIndex: products.length - i,
+              zIndex,
+              "--tx": `calc(-50% + ${tx}%)`,
               "--rot": `${angle}deg`,
               animationDelay: `${delay}ms`,
             } as React.CSSProperties}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={p.image}
-              alt=""
-              aria-hidden
-              loading="lazy"
-              className="absolute inset-0 size-full object-cover"
-            />
-            {/* Bottom scrim so the price stays legible */}
+            {p.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.image}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                // Products: fill the card edge-to-edge (photos look best).
+                // Categories: contain so icon-style images keep their
+                // padding instead of being upscaled past their bounds.
+                className={[
+                  "absolute inset-0 size-full",
+                  p.kind === "product" ? "object-cover" : "object-contain p-3",
+                ].join(" ")}
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="absolute inset-0 grid place-items-center bg-wood-200 text-wood-500 font-display text-xs"
+              >
+                {p.nameFr.slice(0, 1)}
+              </span>
+            )}
+            {/* Bottom scrim so the badge stays legible */}
             <div
               aria-hidden
               className="absolute inset-x-0 bottom-0 h-14 bg-linear-to-t from-forest-900/85 via-forest-900/40 to-transparent"
             />
-            {/* Price pill */}
-            <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-forest-900/90 px-2 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-cream backdrop-blur sm:text-[10.5px]">
-              {formatPrice(p.price)}
+            {/* Badge pill — price for products, category name for cats */}
+            <span
+              className={[
+                "absolute bottom-1.5 left-1/2 -translate-x-1/2 max-w-[90%] truncate rounded-full px-2 py-0.5",
+                "font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-cream backdrop-blur sm:text-[10.5px]",
+                p.kind === "product" ? "bg-forest-900/90" : "bg-tangerine-600/95",
+              ].join(" ")}
+            >
+              {badgeText}
             </span>
           </Link>
         );
@@ -473,4 +570,5 @@ function HeroPile({
     </div>
   );
 }
+
 

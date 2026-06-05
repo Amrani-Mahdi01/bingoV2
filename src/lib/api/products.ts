@@ -35,6 +35,8 @@ export interface ApiProduct {
   descriptionShortAr: string | null;
   descriptionFr: string | null;
   descriptionAr: string | null;
+  /** Optional product video (absolute URL), max one per product. */
+  video: string | null;
   categoryId: string | null;
   brandId: string | null;
   price: number;
@@ -69,6 +71,7 @@ export interface ProductPayload {
   descriptionShortAr?: string | null;
   descriptionFr?: string | null;
   descriptionAr?: string | null;
+  video?: string | null;
   categoryId: number;
   brandId: number;
   price: number;
@@ -117,6 +120,33 @@ export const productsApi = {
     );
   },
 
+  /**
+   * Public product search — hits `GET /api/products?q=…` (no auth).
+   * Used by the storefront header's live search dropdown.
+   * Server-side filters by `name_fr`, `name_ar`, `sku`, and brand name.
+   */
+  searchPublic(params: { q: string; perPage?: number; signal?: AbortSignal } = { q: "" }): Promise<ListResponse> {
+    const query = new URLSearchParams();
+    if (params.q) query.set("q", params.q);
+    query.set("perPage", String(params.perPage ?? 8));
+    return http.get<ListResponse>(
+      `/api/products?${query.toString()}`,
+      { auth: "none", signal: params.signal },
+    );
+  },
+
+  /** Public catalogue list — hits `GET /api/products` (no auth) and
+   *  pulls up to `perPage` active products. The storefront /catalogue
+   *  page loads the whole list once and filters/sorts client-side. */
+  listPublic(opts: { perPage?: number; signal?: AbortSignal } = {}): Promise<ListResponse> {
+    const query = new URLSearchParams();
+    query.set("perPage", String(opts.perPage ?? 100));
+    return http.get<ListResponse>(
+      `/api/products?${query.toString()}`,
+      { auth: "none", signal: opts.signal },
+    );
+  },
+
   get(id: string): Promise<ApiProduct> {
     return http
       .get<SingleResponse>(`/api/admin/products/${id}`, { auth: "admin" })
@@ -144,6 +174,18 @@ export const productsApi = {
     fd.append("file", file);
     return http.upload<{ path: string; url: string }>(
       "/api/admin/uploads/product-image",
+      fd,
+      { auth: "admin" },
+    );
+  },
+
+  uploadVideo(file: File | Blob): Promise<{ path: string; url: string }> {
+    const fd = new FormData();
+    // The Blob comes from client-side compression; give it a filename so the
+    // backend sees a proper .mp4 upload.
+    fd.append("file", file, "video.mp4");
+    return http.upload<{ path: string; url: string }>(
+      "/api/admin/uploads/product-video",
       fd,
       { auth: "admin" },
     );

@@ -56,18 +56,4 @@ export const BANNERS: Banner[] = [
     ctaLabelFr: "Comparer les modèles",
     ctaLabelAr: "قارن النماذج",
   },
-  {
-    id: "4",
-    image:
-      "https://images.unsplash.com/photo-1496080174650-637e3f22fa03?w=2000&q=85&fit=crop",
-    link: "/catalogue?promo=1",
-    titleFr: "Livraison gratuite dès 12 000 DA",
-    titleAr: "توصيل مجاني ابتداءً من 12,000 دج",
-    subtitleFr:
-      "Sur tout le matériel d'aventure, expédié depuis Sétif sous 24 h ouvrées partout en Algérie.",
-    subtitleAr:
-      "على جميع معدات المغامرة، يُشحن من سطيف خلال 24 ساعة عمل إلى جميع أنحاء الجزائر.",
-    ctaLabelFr: "Voir les promotions",
-    ctaLabelAr: "اطلع على العروض",
-  },
 ];

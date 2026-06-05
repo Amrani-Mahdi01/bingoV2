@@ -1,67 +1,34 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
 import { ArrowUpRight, ShoppingBag } from "lucide-react";
 
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
 import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
-import { PRODUCTS } from "@/lib/products";
+import { PRODUCTS, type Product } from "@/lib/products";
+import { useSiteHome } from "@/lib/site-home-context";
+import type { HeroSlot } from "@/lib/site-home";
 import { cn } from "@/lib/utils";
 
-const discountPercent = (price: number, oldPrice?: number) =>
+const discountPercent = (price: number, oldPrice?: number | null) =>
   oldPrice && oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : null;
 
 /**
- * Les plus vendus — best-selling products section.
+ * Les plus vendus — best-selling products section. Cards are populated
+ * from /api/products?flag=bestseller (with a top-sold fallback when no
+ * product is flagged). When the catalogue is empty the section hides
+ * itself entirely.
+ *
  * A hand-drawn boussole (compass) sits in the top-right corner of the
  * section as a decorative anchor; the needle sways gently on a slow loop.
  */
-
-const BEST_SELLERS: Array<{
-  slug: string;
-  name: string;
-  brand: string;
-  price: number;
-  oldPrice?: number;
-  image: string;
-}> = [
-  {
-    slug: "marmot-lithium-0",
-    name: "Sac de couchage en duvet",
-    brand: "Marmot Lithium 0",
-    price: 12500,
-    oldPrice: 14900,
-    image: "https://images.unsplash.com/photo-1487730116645-7be521e35813?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "msr-hubba-nx",
-    name: "Tente 2 places ultralégère",
-    brand: "MSR Hubba NX",
-    price: 18900,
-    image: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "osprey-atmos-65",
-    name: "Sac à dos de trek 65 L",
-    brand: "Osprey Atmos AG",
-    price: 14200,
-    image: "https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "petzl-actik-core",
-    name: "Lampe frontale 450 lm",
-    brand: "Petzl Actik Core",
-    price: 4800,
-    oldPrice: 5600,
-    image: "https://images.unsplash.com/photo-1471919743851-c4df8b6ee133?w=800&q=80&fit=crop",
-  },
-];
-
 export function BestSellers() {
   const { t } = useLanguage();
+  const { bestSellers } = useSiteHome();
+  if (bestSellers.length === 0) return null;
   return (
     <section
       aria-labelledby="best-sellers-title"
@@ -103,9 +70,9 @@ export function BestSellers() {
 
         {/* ─── Product grid ─────────────────────────────────────────── */}
         <ul className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 md:mt-12 md:grid-cols-4 md:gap-5">
-          {BEST_SELLERS.map((p) => (
+          {bestSellers.map((p) => (
             <li key={p.slug}>
-              <ProductCard {...p} />
+              <ProductCard product={p} />
             </li>
           ))}
         </ul>
@@ -115,29 +82,40 @@ export function BestSellers() {
 }
 
 /* ───── Product card ───── */
-function ProductCard({
-  slug,
-  name,
-  brand,
-  price,
-  oldPrice,
-  image,
-}: {
-  slug: string;
-  name: string;
-  brand: string;
-  price: number;
-  oldPrice?: number;
-  image: string;
-}) {
+function ProductCard({ product }: { product: HeroSlot }) {
   const { t } = useLanguage();
   const formatPrice = useFormatPrice();
   const productName = useProductName();
+  const price = product.price ?? 0;
+  const oldPrice = product.oldPrice ?? undefined;
   const pct = discountPercent(price, oldPrice);
-  // Look up the full product (with description, images, etc.) so the
-  // cart icon can push the canonical Product object into the cart.
-  const fullProduct = PRODUCTS.find((p) => p.slug === slug);
-  const displayName = productName({ name, nameAr: fullProduct?.nameAr });
+  const brand = product.brand ?? "";
+  const image = product.image;
+  const slug = product.slug;
+  // The cart + favorites contexts expect the legacy local `Product`
+  // shape. Use the local mock when the slug matches, otherwise build
+  // a synthetic Product from the backend `HeroSlot` so both the heart
+  // and the "Ajouter au panier" button work for every card.
+  const fullProduct: Product = React.useMemo(() => {
+    const legacy = PRODUCTS.find((p) => p.slug === slug);
+    if (legacy) return legacy;
+    return {
+      slug,
+      name: product.nameFr,
+      nameAr: product.nameAr ?? undefined,
+      brand,
+      price,
+      oldPrice,
+      image,
+      categorySlug: undefined,
+      description: "",
+      features: [],
+    };
+  }, [slug, product.nameFr, product.nameAr, brand, price, oldPrice, image]);
+  const displayName = productName({
+    name: product.nameFr,
+    nameAr: product.nameAr,
+  });
   return (
     <TentLink
       href={`/produit/${slug}`}
@@ -185,10 +163,10 @@ function ProductCard({
         </div>
 
         {/* Bottom CTAs — Commander pill (navigates via the card link)
-            stacked above the labeled add-to-cart button. mt-auto
-            keeps every card's bottom edge aligned. */}
-        <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
-          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
+            sits next to the labeled add-to-cart on desktop, stacks on
+            mobile. mt-auto keeps every card's bottom edge aligned. */}
+        <div className="mt-auto flex flex-col gap-2 pt-3 sm:flex-row sm:pt-4">
+          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:flex-1 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
             {t("card.order")}
           </span>

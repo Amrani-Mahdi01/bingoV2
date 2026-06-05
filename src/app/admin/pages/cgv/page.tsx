@@ -62,8 +62,8 @@ const CGV: PageEditorDef = {
           label: "Paragraphe 2 — texte (cgv.art1.p2.text)",
           type: "textarea",
           rows: 3,
-          fr: "(ci-après « le Vendeur »), au capital social de 100 000 DZD, dont le siège social est situé Cité Hassan Bey, Sétif 19000, Algérie, immatriculée au Registre du Commerce d'Algérie sous le numéro XX/00-XXXXXXX ;",
-          ar: "(يُشار إليها لاحقاً بـ « البائع »)، برأسمال اجتماعي قدره 100 000 دج، يقع مقرّها الاجتماعي في حي حسن باي، سطيف 19000، الجزائر، مسجّلة في السجل التجاري الجزائري تحت رقم XX/00-XXXXXXX ؛",
+          fr: "(ci-après « le Vendeur »), au capital social de 100 000 DZD, dont le siège social est situé Cité Dallas, Bâtiment 3 (près de LG), 19000 Sétif, Algérie, immatriculée au Registre du Commerce d'Algérie sous le numéro XX/00-XXXXXXX ;",
+          ar: "(يُشار إليها لاحقاً بـ « البائع »)، برأسمال اجتماعي قدره 100 000 دج، يقع مقرّها الاجتماعي في حي دالاس، عمارة 3 (بجوار LG)، 19000 سطيف، الجزائر، مسجّلة في السجل التجاري الجزائري تحت رقم XX/00-XXXXXXX ؛",
         },
         {
           id: "cgv-art1-p3",

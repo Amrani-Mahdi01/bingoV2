@@ -6,6 +6,8 @@ import {
   Check,
   ChevronsUpDown,
   ImageIcon,
+  Loader2,
+  Pencil,
   Plus,
   Trash2,
   Upload,
@@ -38,6 +40,7 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Small } from "@/components/ui/typography";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { RichEditor } from "@/components/admin/RichEditor";
 import { VariantManager, type VariantRow } from "@/components/admin/VariantManager";
 import { brandsApi, type ApiBrand } from "@/lib/api/brands";
@@ -102,6 +105,13 @@ function extractMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Human-readable file size in FR units (o / Ko / Mo). */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
 interface ProductImageDraft {
   /** Absolute URL of an already-uploaded image. */
   url: string;
@@ -114,8 +124,42 @@ interface ProductCreateFormProps {
   initialProduct?: ApiProduct;
 }
 
+/* ───── Field validation patterns ───────────────────────────────
+   Used by save() to reject malformed input client-side before it
+   ever hits the API. Keep these conservative — Laravel still
+   re-validates everything on the server. */
+
+// Must contain at least one Latin letter (otherwise the FR name is
+// almost certainly wrong) and stay within the schema's 191-char limit.
+const NAME_FR_RE = /^(?=.*[A-Za-zÀ-ſ])[\s\S]{2,191}$/;
+
+// Must contain at least one Arabic letter for the AR name. The
+// extended Arabic Unicode blocks cover regular + Arabic Supplement.
+const NAME_AR_RE = /^(?=.*[؀-ۿݐ-ݿ])[\s\S]{2,191}$/;
+
+// Bounded plain text for the short descriptions (DB column is 500).
+const SHORT_DESC_RE = /^[\s\S]{0,500}$/;
+
+// Long description — generous bound to allow rich content but cap it.
+const LONG_DESC_RE = /^[\s\S]{0,5000}$/;
+
+// Helper: rich-editor outputs HTML; this gives us the plain-text size
+// so we can validate against character bounds without counting tags.
+const stripHtml = (s: string) => s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+// Positive integer in DA. Digits only, no leading zeros, no decimals.
+const PRICE_RE = /^[1-9]\d*$/;
+
+// Non-negative integer for stock counts / thresholds.
+const NON_NEG_INT_RE = /^(0|[1-9]\d*)$/;
+
+// Hard cap on product photos. Enforced here in the upload UI and again on
+// the backend at product save (StoreProductRequest).
+const MAX_IMAGES = 5;
+
 export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {}) {
   const router = useRouter();
+  const confirm = useConfirm();
   const isEdit = !!initialProduct;
 
   // Lookup data
@@ -149,7 +193,6 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
     initialProduct?.brandId ?? null
   );
   const [isActive, setIsActive] = React.useState(initialProduct?.isActive ?? true);
-  const [isFeatured, setIsFeatured] = React.useState(initialProduct?.isFeatured ?? false);
   const [isNew, setIsNew] = React.useState(initialProduct?.isNew ?? false);
   const [isPromo, setIsPromo] = React.useState(initialProduct?.isPromo ?? false);
   const [isBestSeller, setIsBestSeller] = React.useState(
@@ -173,8 +216,47 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
     })) ?? []
   );
 
+  // One optional product video (absolute URL once uploaded).
+  const [video, setVideo] = React.useState<string | null>(
+    initialProduct?.video ?? null
+  );
+  // Compression/upload progress: null = idle, otherwise 0..100.
+  const [videoProgress, setVideoProgress] = React.useState<number | null>(null);
+  // True when the stored video URL fails to load (e.g. the file was deleted
+  // out-of-band) — show a clear message instead of a broken black player.
+  const [videoBroken, setVideoBroken] = React.useState(false);
+
   const [uploading, setUploading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+
+  // Per-field validation errors. Populated by `validate()` before save
+  // and cleared on the relevant field's first keystroke so the message
+  // disappears as soon as the admin corrects it.
+  type FieldError =
+    | "nameFr"
+    | "nameAr"
+    | "shortFr"
+    | "shortAr"
+    | "descFr"
+    | "descAr"
+    | "price"
+    | "oldPrice"
+    | "stock"
+    | "lowStock"
+    | "catId"
+    | "subId"
+    | "brandId";
+  const [errors, setErrors] = React.useState<Partial<Record<FieldError, string>>>(
+    {},
+  );
+  const clearError = React.useCallback((k: FieldError) => {
+    setErrors((prev) => {
+      if (!prev[k]) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
+  }, []);
 
   React.useEffect(() => {
     void categoriesApi.listAll().then((cats) => {
@@ -209,7 +291,14 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
   const subs = currentTop?.children ?? [];
 
   // When the parent changes, drop any sub selection from a different parent.
+  // Important: this must NOT run before a parent has been resolved — in
+  // edit mode the form mounts with `subId` already set (from the product
+  // being edited) but `parentId` only gets resolved asynchronously by the
+  // tree-walk effect above, once `categoriesApi.listAll()` returns. Without
+  // the parentId guard, this effect would fire on first render with
+  // `subs === []` and wipe the initial sub-category.
   React.useEffect(() => {
+    if (!parentId) return;
     if (subId && !subs.some((s) => s.id === subId)) {
       setSubId(null);
     }
@@ -219,10 +308,25 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
   const currentSub = subs.find((s) => s.id === subId) ?? null;
 
   const onUploadFiles = async (files: FileList | File[] | null | undefined) => {
-    const list = files
+    let list = files
       ? Array.from(files).filter((f) => f.type.startsWith("image/"))
       : [];
     if (list.length === 0) return;
+
+    // Enforce the 5-photo cap. Compute the free slots from the current
+    // count and trim the incoming batch (drag-drop can carry many files).
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) {
+      toast.error(`Maximum ${MAX_IMAGES} photos par produit.`);
+      return;
+    }
+    if (list.length > remaining) {
+      toast.warning(
+        `Maximum ${MAX_IMAGES} photos : seules les ${remaining} première(s) ont été retenue(s).`,
+      );
+      list = list.slice(0, remaining);
+    }
+
     setUploading(true);
     let ok = 0;
     let failed = 0;
@@ -263,6 +367,54 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
     });
   };
 
+  // Compress the picked video in the browser (ffmpeg.wasm → 720p MP4), then
+  // upload the smaller result. Progress covers the compression pass; the
+  // short upload that follows just shows the bar pinned near 100%.
+  const onSelectVideo = async (file: File | null | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      toast.error("Choisissez un fichier vidéo.");
+      return;
+    }
+    setVideoBroken(false);
+    setVideoProgress(0);
+    try {
+      const { compressVideo } = await import("@/lib/video-compress");
+      const { blob, originalSize, compressedSize } = await compressVideo(
+        file,
+        (r) => setVideoProgress(Math.round(r * 100)),
+      );
+      setVideoProgress(100);
+      const { url } = await productsApi.uploadVideo(blob);
+      setVideo(url);
+      const pct = originalSize
+        ? Math.max(0, Math.round((1 - compressedSize / originalSize) * 100))
+        : 0;
+      toast.success(
+        `Vidéo compressée (${formatBytes(originalSize)} → ${formatBytes(
+          compressedSize,
+        )}, −${pct}%)`,
+      );
+    } catch (err) {
+      toast.error(extractMessage(err, "Échec de la compression vidéo."));
+    } finally {
+      setVideoProgress(null);
+    }
+  };
+
+  const removeVideo = async () => {
+    const ok = await confirm({
+      title: "Retirer la vidéo ?",
+      message:
+        "La vidéo sera retirée de la fiche. La suppression définitive du fichier prend effet après « Enregistrer ».",
+      variant: "destructive",
+      confirmLabel: "Retirer",
+    });
+    if (!ok) return;
+    setVideo(null);
+    setVideoBroken(false);
+  };
+
   const [isDragging, setIsDragging] = React.useState(false);
   const dragDepthRef = React.useRef(0);
 
@@ -289,28 +441,93 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
     void onUploadFiles(e.dataTransfer.files);
   };
 
-  const save = async () => {
-    if (!nameFr.trim() || !nameAr.trim()) {
-      toast.error("Renseignez les noms FR et AR");
-      return;
+  const validate = (): {
+    errs: Partial<Record<FieldError, string>>;
+    priceN: number;
+    oldN: number | null;
+    stockN: number;
+    lowN: number;
+  } => {
+    const errs: Partial<Record<FieldError, string>> = {};
+
+    const nameFrT = nameFr.trim();
+    if (!nameFrT) errs.nameFr = "Le nom FR est requis.";
+    else if (!NAME_FR_RE.test(nameFrT))
+      errs.nameFr =
+        "2–191 caractères, doit contenir au moins une lettre latine.";
+
+    const nameArT = nameAr.trim();
+    if (!nameArT) errs.nameAr = "Le nom AR est requis.";
+    else if (!NAME_AR_RE.test(nameArT))
+      errs.nameAr =
+        "2–191 caractères, doit contenir au moins une lettre arabe.";
+
+    if (shortFr && !SHORT_DESC_RE.test(shortFr))
+      errs.shortFr = "500 caractères maximum.";
+    if (shortAr && !SHORT_DESC_RE.test(shortAr))
+      errs.shortAr = "500 caractères maximum.";
+
+    // Long descriptions — required for SEO + client clarity. RichEditor
+    // produces HTML, so we check the visible text length (tags stripped)
+    // and require at least one letter of the expected script.
+    const descFrText = stripHtml(descFr);
+    if (!descFrText) {
+      errs.descFr = "La description FR est requise.";
+    } else if (!LONG_DESC_RE.test(descFrText)) {
+      errs.descFr = "5000 caractères maximum.";
+    } else if (descFrText.length < 10) {
+      errs.descFr = "Au moins 10 caractères.";
+    } else if (!/[A-Za-zÀ-ſ]/.test(descFrText)) {
+      errs.descFr = "Doit contenir au moins une lettre latine.";
     }
-    if (!subId) {
-      toast.error("Choisissez une sous-catégorie");
-      return;
-    }
-    if (!brandId) {
-      toast.error("Choisissez une marque");
-      return;
-    }
-    const priceN = parseInt(price, 10);
-    if (!Number.isFinite(priceN) || priceN < 0) {
-      toast.error("Prix invalide");
-      return;
+    const descArText = stripHtml(descAr);
+    if (!descArText) {
+      errs.descAr = "La description AR est requise.";
+    } else if (!LONG_DESC_RE.test(descArText)) {
+      errs.descAr = "5000 caractères maximum.";
+    } else if (descArText.length < 10) {
+      errs.descAr = "Au moins 10 caractères.";
+    } else if (!/[؀-ۿݐ-ݿ]/.test(descArText)) {
+      errs.descAr = "Doit contenir au moins une lettre arabe.";
     }
 
-    const oldN = oldPrice.trim() === "" ? null : parseInt(oldPrice, 10);
-    if (oldN !== null && (!Number.isFinite(oldN) || oldN < priceN)) {
-      toast.error("L'ancien prix doit être ≥ prix actuel");
+    if (!parentId) errs.catId = "Choisissez une catégorie principale.";
+    if (!subId) errs.subId = "Choisissez une sous-catégorie.";
+    if (!brandId) errs.brandId = "Choisissez une marque.";
+
+    if (!price.trim()) errs.price = "Le prix est requis.";
+    else if (!PRICE_RE.test(price))
+      errs.price = "Entier positif uniquement (sans 0 en tête).";
+    const priceN = errs.price ? Number.NaN : parseInt(price, 10);
+
+    const oldRaw = oldPrice.trim();
+    let oldN: number | null = null;
+    if (oldRaw) {
+      if (!PRICE_RE.test(oldRaw))
+        errs.oldPrice = "Entier positif uniquement.";
+      else {
+        oldN = parseInt(oldRaw, 10);
+        if (Number.isFinite(priceN) && oldN < priceN)
+          errs.oldPrice = "L'ancien prix doit être supérieur au prix actuel.";
+      }
+    }
+
+    if (stock && !NON_NEG_INT_RE.test(stock))
+      errs.stock = "Entier ≥ 0 uniquement.";
+    const stockN = errs.stock ? 0 : parseInt(stock || "0", 10) || 0;
+
+    if (lowStock && !NON_NEG_INT_RE.test(lowStock))
+      errs.lowStock = "Entier ≥ 0 uniquement.";
+    const lowN = errs.lowStock ? 5 : parseInt(lowStock || "5", 10) || 5;
+
+    return { errs, priceN, oldN, stockN, lowN };
+  };
+
+  const save = async () => {
+    const { errs, priceN, oldN, stockN, lowN } = validate();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      toast.error("Corrigez les champs en rouge avant d'enregistrer.");
       return;
     }
 
@@ -321,14 +538,14 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       descriptionShortAr: shortAr.trim() || null,
       descriptionFr: descFr.trim() || null,
       descriptionAr: descAr.trim() || null,
+      video,
       categoryId: Number(subId),
       brandId: Number(brandId),
       price: priceN,
       oldPrice: oldN,
-      stock: parseInt(stock || "0", 10) || 0,
-      lowStockThreshold: parseInt(lowStock || "5", 10) || 5,
+      stock: stockN,
+      lowStockThreshold: lowN,
       isActive,
-      isFeatured,
       isNew,
       isBestSeller,
       isPromo,
@@ -369,10 +586,18 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
           labelAr="الاسم (AR)"
           valueFr={nameFr}
           valueAr={nameAr}
-          onChangeFr={setNameFr}
-          onChangeAr={setNameAr}
+          onChangeFr={(v) => {
+            setNameFr(v);
+            clearError("nameFr");
+          }}
+          onChangeAr={(v) => {
+            setNameAr(v);
+            clearError("nameAr");
+          }}
           placeholderFr="Tente 2 places MH100"
           placeholderAr="خيمة شخصين MH100"
+          errorFr={errors.nameFr}
+          errorAr={errors.nameAr}
         />
         <BilingualField
           multiline
@@ -381,10 +606,18 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
           labelAr="وصف قصير (AR)"
           valueFr={shortFr}
           valueAr={shortAr}
-          onChangeFr={setShortFr}
-          onChangeAr={setShortAr}
+          onChangeFr={(v) => {
+            setShortFr(v);
+            clearError("shortFr");
+          }}
+          onChangeAr={(v) => {
+            setShortAr(v);
+            clearError("shortAr");
+          }}
           placeholderFr="Tente dôme légère, étanchéité 2000 mm…"
           placeholderAr="خيمة قبّة خفيفة، عزل ماء 2000 ملم…"
+          errorFr={errors.shortFr}
+          errorAr={errors.shortAr}
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -393,9 +626,18 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
             </Label>
             <RichEditor
               value={descFr}
-              onChange={setDescFr}
+              onChange={(v) => {
+                setDescFr(v);
+                clearError("descFr");
+              }}
               placeholder="Caractéristiques, conseils d'usage, montage…"
+              className={
+                errors.descFr
+                  ? "border-red-500 ring-2 ring-red-500/20"
+                  : undefined
+              }
             />
+            {errors.descFr ? <FieldError message={errors.descFr} /> : null}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-zinc-700" dir="rtl">
@@ -403,10 +645,19 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
             </Label>
             <RichEditor
               value={descAr}
-              onChange={setDescAr}
+              onChange={(v) => {
+                setDescAr(v);
+                clearError("descAr");
+              }}
               placeholder="الخصائص، نصائح الاستعمال، التركيب…"
               rtl
+              className={
+                errors.descAr
+                  ? "border-red-500 ring-2 ring-red-500/20"
+                  : undefined
+              }
             />
+            {errors.descAr ? <FieldError message={errors.descAr} /> : null}
           </div>
         </div>
       </Section>
@@ -414,12 +665,14 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       {/* Classification */}
       <Section title="Classification">
         <div className="grid gap-4 sm:grid-cols-3">
-          <FieldShell label="Catégorie principale">
+          <FieldShell label="Catégorie principale" error={errors.catId}>
             <Combobox
               value={currentTop?.id ?? null}
               onChange={(id) => {
                 setParentId(id);
                 setSubId(null);
+                clearError("catId");
+                clearError("subId");
               }}
               options={topCats.map((c) => ({
                 value: c.id,
@@ -430,10 +683,13 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
               empty="Aucune catégorie"
             />
           </FieldShell>
-          <FieldShell label="Sous-catégorie">
+          <FieldShell label="Sous-catégorie" error={errors.subId}>
             <Combobox
               value={currentSub?.id ?? null}
-              onChange={setSubId}
+              onChange={(id) => {
+                setSubId(id);
+                clearError("subId");
+              }}
               options={subs.map((c) => ({
                 value: c.id,
                 label: c.nameFr,
@@ -450,14 +706,23 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
               disabled={!currentTop}
             />
           </FieldShell>
-          <FieldShell label="Marque">
+          <FieldShell label="Marque" error={errors.brandId}>
             <BrandPicker
               value={brandId}
-              onChange={setBrandId}
+              onChange={(id) => {
+                setBrandId(id);
+                clearError("brandId");
+              }}
               brands={brands ?? []}
               onBrandCreated={(brand) => {
                 setBrands((prev) => [...(prev ?? []), brand]);
                 setBrandId(brand.id);
+                clearError("brandId");
+              }}
+              onBrandUpdated={(brand) => {
+                setBrands((prev) =>
+                  (prev ?? []).map((b) => (b.id === brand.id ? brand : b)),
+                );
               }}
             />
           </FieldShell>
@@ -467,46 +732,87 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       {/* Pricing + stock */}
       <Section title="Prix & stock">
         <div className="grid gap-4 sm:grid-cols-4">
-          <FieldShell label="Prix (DZD)">
+          <FieldShell label="Prix (DZD)" error={errors.price}>
             <Input
               type="number"
               inputMode="numeric"
-              min={0}
+              min={1}
+              step={1}
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              onChange={(e) => {
+                setPrice(e.target.value);
+                clearError("price");
+                clearError("oldPrice");
+              }}
               placeholder="0"
-              className="font-mono"
+              pattern="[1-9][0-9]*"
+              aria-invalid={!!errors.price}
+              className={cn(
+                "font-mono",
+                errors.price &&
+                  "border-red-500 focus-visible:border-red-600 focus-visible:ring-red-500/20",
+              )}
             />
           </FieldShell>
-          <FieldShell label="Ancien prix">
+          <FieldShell label="Ancien prix" error={errors.oldPrice}>
             <Input
               type="number"
               inputMode="numeric"
-              min={0}
+              min={1}
+              step={1}
               value={oldPrice}
-              onChange={(e) => setOldPrice(e.target.value)}
+              onChange={(e) => {
+                setOldPrice(e.target.value);
+                clearError("oldPrice");
+              }}
               placeholder="facultatif"
-              className="font-mono"
+              pattern="[1-9][0-9]*"
+              aria-invalid={!!errors.oldPrice}
+              className={cn(
+                "font-mono",
+                errors.oldPrice &&
+                  "border-red-500 focus-visible:border-red-600 focus-visible:ring-red-500/20",
+              )}
             />
           </FieldShell>
-          <FieldShell label="Stock">
+          <FieldShell label="Stock" error={errors.stock}>
             <Input
               type="number"
               inputMode="numeric"
               min={0}
+              step={1}
               value={stock}
-              onChange={(e) => setStock(e.target.value)}
-              className="font-mono"
+              onChange={(e) => {
+                setStock(e.target.value);
+                clearError("stock");
+              }}
+              pattern="[0-9]*"
+              aria-invalid={!!errors.stock}
+              className={cn(
+                "font-mono",
+                errors.stock &&
+                  "border-red-500 focus-visible:border-red-600 focus-visible:ring-red-500/20",
+              )}
             />
           </FieldShell>
-          <FieldShell label="Seuil stock bas">
+          <FieldShell label="Seuil stock bas" error={errors.lowStock}>
             <Input
               type="number"
               inputMode="numeric"
               min={0}
+              step={1}
               value={lowStock}
-              onChange={(e) => setLowStock(e.target.value)}
-              className="font-mono"
+              onChange={(e) => {
+                setLowStock(e.target.value);
+                clearError("lowStock");
+              }}
+              pattern="[0-9]*"
+              aria-invalid={!!errors.lowStock}
+              className={cn(
+                "font-mono",
+                errors.lowStock &&
+                  "border-red-500 focus-visible:border-red-600 focus-visible:ring-red-500/20",
+              )}
             />
           </FieldShell>
         </div>
@@ -525,7 +831,6 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       <Section title="Mise en avant">
         <div className="flex flex-wrap gap-x-6 gap-y-3">
           <FlagToggle label="Actif" checked={isActive} onChange={setIsActive} />
-          <FlagToggle label="En vedette" checked={isFeatured} onChange={setIsFeatured} />
           <FlagToggle label="Nouveauté" checked={isNew} onChange={setIsNew} />
           <FlagToggle label="Best-seller" checked={isBestSeller} onChange={setIsBestSeller} />
           <FlagToggle label="Promotion" checked={isPromo} onChange={setIsPromo} />
@@ -577,8 +882,12 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
                         </div>
                       )}
 
-                      {/* Trash button — stopPropagation so clicking it
-                          doesn't also promote the image. */}
+                      {/* Trash button — always visible so the admin
+                          can remove a photo without hunting for a
+                          hover target. `stopPropagation` keeps the
+                          tap from also promoting the image to
+                          "principal". Slight shadow + white halo so
+                          it stays legible on any image. */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -586,7 +895,7 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
                           removeImage(i);
                         }}
                         aria-label="Supprimer"
-                        className="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md bg-white/90 text-red-700 opacity-0 transition-opacity hover:bg-white hover:text-red-800 group-hover:opacity-100"
+                        className="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md bg-white/95 text-red-700 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-white hover:text-red-800"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -595,14 +904,16 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
                 })}
               </ul>
               <Small className="text-zinc-500">
-                Cliquez sur une photo pour la définir comme image principale.
+                {images.length} / {MAX_IMAGES} photos · cliquez sur une photo
+                pour la définir comme image principale.
               </Small>
             </>
           ) : null}
 
           {/* Dropzone — click to open file picker OR drag images onto it.
               Accepts multiple files in one drop; first file becomes the
-              principal photo. */}
+              principal photo. Hidden once the 5-photo cap is reached. */}
+          {images.length < MAX_IMAGES ? (
           <label
             onDragEnter={onDragEnter}
             onDragLeave={onDragLeave}
@@ -634,6 +945,7 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
               </p>
               <Small className="text-zinc-500">
                 PNG / JPG / WebP / AVIF · max 10 Mo · redimensionné à 1600×1600
+                · converties en WebP
               </Small>
             </div>
             <input
@@ -645,12 +957,87 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
               disabled={uploading}
             />
           </label>
+          ) : (
+            <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-center text-xs text-zinc-500">
+              Limite de {MAX_IMAGES} photos atteinte. Supprimez-en une pour en
+              ajouter une autre.
+            </p>
+          )}
 
           {images.length === 0 ? (
             <Small className="text-zinc-500">
               La première image téléversée devient la photo principale.
             </Small>
           ) : null}
+        </div>
+      </Section>
+
+      {/* Video — at most one per product, compressed in the browser */}
+      <Section title="Vidéo">
+        <div className="space-y-3">
+          {videoProgress !== null ? (
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex items-center gap-2 text-sm text-zinc-700">
+                <Loader2 className="size-4 animate-spin text-emerald-600" />
+                Compression de la vidéo… {videoProgress}%
+              </div>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
+                <div
+                  className="h-full bg-emerald-500 transition-all"
+                  style={{ width: `${videoProgress}%` }}
+                />
+              </div>
+              <Small className="mt-2 block text-zinc-500">
+                La compression se fait dans votre navigateur — gardez cet
+                onglet ouvert.
+              </Small>
+            </div>
+          ) : video ? (
+            <div className="space-y-2">
+              {videoBroken ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                  Vidéo introuvable (le fichier a été supprimé). Cliquez sur
+                  « Retirer la vidéo » puis « Enregistrer » pour nettoyer la
+                  fiche.
+                </p>
+              ) : (
+                <div className="overflow-hidden rounded-md border border-zinc-200 bg-black">
+                  <video
+                    src={video}
+                    controls
+                    className="max-h-64 w-full"
+                    onError={() => setVideoBroken(true)}
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => void removeVideo()}
+                className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-red-700 transition-colors hover:bg-red-50"
+              >
+                <Trash2 className="size-3.5" /> Retirer la vidéo
+              </button>
+            </div>
+          ) : (
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-zinc-300 bg-zinc-50 px-4 py-8 text-center transition-colors hover:border-zinc-400 hover:bg-zinc-100">
+              <Upload className="size-6 text-zinc-500" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-zinc-700">
+                  Ajouter une vidéo (une seule par produit)
+                </p>
+                <Small className="text-zinc-500">
+                  MP4 / WebM / MOV · compressée en 720p dans le navigateur ·
+                  max 30 Mo après compression
+                </Small>
+              </div>
+              <input
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => void onSelectVideo(e.target.files?.[0])}
+              />
+            </label>
+          )}
         </div>
       </Section>
 
@@ -709,16 +1096,33 @@ function Section({
 
 function FieldShell({
   label,
+  error,
   children,
 }: {
   label: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium text-zinc-700">{label}</Label>
       {children}
+      {error ? <FieldError message={error} /> : null}
     </div>
+  );
+}
+
+/** Tiny red inline error message — reused under inputs that don't go
+ *  through FieldShell (price, stock, etc.). */
+function FieldError({ message }: { message: string }) {
+  return (
+    <p
+      role="alert"
+      className="flex items-center gap-1 text-2xs font-medium text-red-600"
+    >
+      <span aria-hidden className="inline-block size-1 rounded-full bg-red-600" />
+      {message}
+    </p>
   );
 }
 
@@ -750,6 +1154,8 @@ function BilingualField({
   placeholderAr,
   multiline,
   rows = 3,
+  errorFr,
+  errorAr,
 }: {
   labelFr: string;
   labelAr: string;
@@ -761,7 +1167,10 @@ function BilingualField({
   placeholderAr?: string;
   multiline?: boolean;
   rows?: number;
+  errorFr?: string;
+  errorAr?: string;
 }) {
+  const invalidCls = "border-red-500 focus-visible:border-red-600 focus-visible:ring-red-500/20";
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
@@ -772,14 +1181,19 @@ function BilingualField({
             value={valueFr}
             onChange={(e) => onChangeFr(e.target.value)}
             placeholder={placeholderFr}
+            aria-invalid={!!errorFr}
+            className={errorFr ? invalidCls : undefined}
           />
         ) : (
           <Input
             value={valueFr}
             onChange={(e) => onChangeFr(e.target.value)}
             placeholder={placeholderFr}
+            aria-invalid={!!errorFr}
+            className={errorFr ? invalidCls : undefined}
           />
         )}
+        {errorFr ? <FieldError message={errorFr} /> : null}
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs font-medium text-zinc-700" dir="rtl">
@@ -793,6 +1207,8 @@ function BilingualField({
             placeholder={placeholderAr}
             dir="rtl"
             lang="ar"
+            aria-invalid={!!errorAr}
+            className={errorAr ? invalidCls : undefined}
           />
         ) : (
           <Input
@@ -801,8 +1217,11 @@ function BilingualField({
             placeholder={placeholderAr}
             dir="rtl"
             lang="ar"
+            aria-invalid={!!errorAr}
+            className={errorAr ? invalidCls : undefined}
           />
         )}
+        {errorAr ? <FieldError message={errorAr} /> : null}
       </div>
     </div>
   );
@@ -904,14 +1323,18 @@ function BrandPicker({
   onChange,
   brands,
   onBrandCreated,
+  onBrandUpdated,
 }: {
   value: string | null;
   onChange: (v: string | null) => void;
   brands: ApiBrand[];
   onBrandCreated: (brand: ApiBrand) => void;
+  onBrandUpdated: (brand: ApiBrand) => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const [createOpen, setCreateOpen] = React.useState(false);
+  // Brand currently being edited (null = none). Drives the edit dialog.
+  const [editing, setEditing] = React.useState<ApiBrand | null>(null);
   const captureScroll = useFreezeScrollOnOpen(open);
   const current = brands.find((b) => b.id === value) ?? null;
 
@@ -976,6 +1399,23 @@ function BrandPicker({
                     {b.id === value ? (
                       <Check className="size-4 text-emerald-600" />
                     ) : null}
+                    {/* Edit — opens the dialog pre-filled. stopPropagation so
+                        clicking the pencil doesn't also select the row. */}
+                    <button
+                      type="button"
+                      aria-label={`Modifier ${b.name}`}
+                      title="Modifier la marque"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setOpen(false);
+                        setEditing(b);
+                      }}
+                      className="inline-flex size-6 shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -996,38 +1436,53 @@ function BrandPicker({
         </PopoverContent>
       </Popover>
 
-      <CreateBrandDialog
+      <BrandDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreated={onBrandCreated}
+        onSaved={onBrandCreated}
+      />
+      <BrandDialog
+        open={editing !== null}
+        onOpenChange={(v) => {
+          if (!v) setEditing(null);
+        }}
+        brand={editing}
+        onSaved={onBrandUpdated}
       />
     </>
   );
 }
 
-function CreateBrandDialog({
+function BrandDialog({
   open,
   onOpenChange,
-  onCreated,
+  onSaved,
+  brand = null,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreated: (brand: ApiBrand) => void;
+  onSaved: (brand: ApiBrand) => void;
+  /** When provided, the dialog edits this brand (PUT). When null, it
+   *  creates a new one (POST). */
+  brand?: ApiBrand | null;
 }) {
+  const isEdit = brand !== null;
   const [name, setName] = React.useState("");
   const [country, setCountry] = React.useState("");
   const [descFr, setDescFr] = React.useState("");
   const [descAr, setDescAr] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
+  // Pre-fill from the brand being edited (or reset to blank for create)
+  // each time the dialog opens.
   React.useEffect(() => {
     if (open) {
-      setName("");
-      setCountry("");
-      setDescFr("");
-      setDescAr("");
+      setName(brand?.name ?? "");
+      setCountry(brand?.country ?? "");
+      setDescFr(brand?.descriptionFr ?? "");
+      setDescAr(brand?.descriptionAr ?? "");
     }
-  }, [open]);
+  }, [open, brand]);
 
   const save = async () => {
     if (!name.trim()) {
@@ -1036,18 +1491,28 @@ function CreateBrandDialog({
     }
     setSaving(true);
     try {
-      const brand = await brandsApi.create({
+      const payload = {
         name: name.trim(),
         country: country.trim().toUpperCase() || null,
         descriptionFr: descFr.trim() || null,
         descriptionAr: descAr.trim() || null,
-        isActive: true,
-      });
-      toast.success(`Marque créée : ${brand.name}`);
-      onCreated(brand);
+        isActive: brand?.isActive ?? true,
+      };
+      const saved = isEdit
+        ? await brandsApi.update(brand.id, payload)
+        : await brandsApi.create(payload);
+      toast.success(
+        isEdit ? `Marque modifiée : ${saved.name}` : `Marque créée : ${saved.name}`,
+      );
+      onSaved(saved);
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractMessage(err, "Erreur lors de la création"));
+      toast.error(
+        extractMessage(
+          err,
+          isEdit ? "Erreur lors de la modification" : "Erreur lors de la création",
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -1056,10 +1521,13 @@ function CreateBrandDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Controlled externally — opened by the "+ Ajouter une marque"
-          button inside BrandPicker; no DialogTrigger needed. */}
+          button or a row's edit pencil inside BrandPicker; no
+          DialogTrigger needed. */}
       <DialogContent className="w-[min(100vw-2rem,32rem)] max-w-none sm:max-w-none">
         <DialogHeader>
-          <DialogTitle>Ajouter une marque</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Modifier la marque" : "Ajouter une marque"}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <FieldShell label="Nom de la marque">
@@ -1118,7 +1586,13 @@ function CreateBrandDialog({
             onClick={() => void save()}
             disabled={saving}
           >
-            {saving ? "Création…" : "Créer la marque"}
+            {saving
+              ? isEdit
+                ? "Enregistrement…"
+                : "Création…"
+              : isEdit
+                ? "Enregistrer"
+                : "Créer la marque"}
           </Button>
         </DialogFooter>
       </DialogContent>

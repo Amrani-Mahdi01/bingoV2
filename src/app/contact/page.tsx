@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
+import ReCAPTCHA from "react-google-recaptcha";
 import {
   ArrowRight,
   Check,
@@ -11,21 +12,51 @@ import {
 } from "lucide-react";
 
 import { WhatsappIcon } from "@/components/icons/social";
+import { contactApi } from "@/lib/api/contact";
+import { HttpError } from "@/lib/api/http";
 import { useLanguage } from "@/lib/i18n";
+import { useSiteContact } from "@/lib/site-contact-context";
 import { cn } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Same env var the checkout + register pages use — empty in local
+// dev means "no captcha required" and the widget is not rendered.
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? "";
 
-type Errors = Partial<Record<"name" | "email" | "subject" | "message", string>>;
+type Errors = Partial<
+  Record<"name" | "email" | "subject" | "message" | "recaptcha" | "form", string>
+>;
+
+/** Default Google Maps URL used when the admin hasn't set one in
+ *  /admin/contacts. Keeps the "Voir l'adresse" CTA functional out of
+ *  the box. */
+const DEFAULT_MAPS_URL =
+  "https://www.google.com/maps/place/Bingo+camping/@36.1900738,5.4351576,17z/data=!3m1!4b1!4m6!3m5!1s0x12f315006648bb7f:0xc3f606259fdccfa4!8m2!3d36.1900695!4d5.4377325!16s%2Fg%2F11m604401h?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D";
 
 export default function ContactPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const siteContact = useSiteContact();
+  // Address coming from /admin/contacts — bilingual, with the legacy
+  // i18n strings as a final fallback so existing translations stay
+  // useful for non-merchant deployments.
+  const addressLine1 =
+    (lang === "ar" ? siteContact.addressAr : siteContact.addressFr) ||
+    t("about.shop.address.line1");
+  const addressLine2 = t("about.shop.address.line2");
+  const placeLabel =
+    (lang === "ar" ? siteContact.mapsPlaceAr : siteContact.mapsPlaceFr) || "";
+  const mapsHref = siteContact.mapsUrl || DEFAULT_MAPS_URL;
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [subject, setSubject] = React.useState("");
   const [message, setMessage] = React.useState("");
   const [errors, setErrors] = React.useState<Errors>({});
   const [submitted, setSubmitted] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [recaptchaToken, setRecaptchaToken] = React.useState<string | null>(
+    null,
+  );
+  const recaptchaRef = React.useRef<ReCAPTCHA | null>(null);
 
   const clearError = (k: keyof Errors) =>
     setErrors((prev) => {
@@ -43,21 +74,62 @@ export default function ContactPage() {
     if (!subject.trim()) e.subject = t("contact.error.subject");
     if (!message.trim()) e.message = t("contact.error.messageMissing");
     else if (message.trim().length < 10) e.message = t("contact.error.messageShort");
+    // Only enforce captcha when a site key is configured.
+    if (RECAPTCHA_SITE_KEY && !recaptchaToken) {
+      e.recaptcha = t("checkout.error.recaptcha");
+    }
     return e;
   };
 
-  const onSubmit = (ev: React.FormEvent) => {
+  const onSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     const next = validate();
     setErrors(next);
     if (Object.keys(next).length > 0) return;
-    // TODO: POST to a backend endpoint
-    setSubmitted(true);
+
+    setSubmitting(true);
+    try {
+      await contactApi.submit({
+        name: name.trim(),
+        email: email.trim(),
+        subject: subject.trim(),
+        message: message.trim(),
+        recaptchaToken,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      // Reset captcha after any failure so the customer can solve a
+      // fresh challenge (Google tokens are single-use).
+      recaptchaRef.current?.reset();
+      setRecaptchaToken(null);
+      // Pull field-level errors out of the Laravel 422 shape, fall
+      // back to a generic form error otherwise.
+      if (err instanceof HttpError && err.status === 422) {
+        const body = err.body as
+          | { message?: string; errors?: Record<string, string[]> }
+          | undefined;
+        const fieldErrors: Errors = {};
+        if (body?.errors?.name?.[0]) fieldErrors.name = body.errors.name[0];
+        if (body?.errors?.email?.[0]) fieldErrors.email = body.errors.email[0];
+        if (body?.errors?.subject?.[0]) fieldErrors.subject = body.errors.subject[0];
+        if (body?.errors?.message?.[0]) fieldErrors.message = body.errors.message[0];
+        if (body?.errors?.recaptcha?.[0])
+          fieldErrors.recaptcha = body.errors.recaptcha[0];
+        if (Object.keys(fieldErrors).length === 0) {
+          fieldErrors.form = body?.message ?? t("contact.error.server");
+        }
+        setErrors(fieldErrors);
+      } else {
+        setErrors({ form: t("contact.error.server") });
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <main className="flex flex-1 flex-col bg-cream py-10 md:py-14">
-      <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 md:px-10">
         {/* Breadcrumb */}
         <nav
           aria-label={t("breadcrumb.aria")}
@@ -98,13 +170,15 @@ export default function ContactPage() {
                 setSubject("");
                 setMessage("");
                 setErrors({});
+                recaptchaRef.current?.reset();
+                setRecaptchaToken(null);
               }}
             />
           ) : (
             <form
               onSubmit={onSubmit}
               noValidate
-              className="rounded-2xl border border-wood-300/50 bg-cream-deep/30 p-5 sm:p-6"
+              className="rounded-2xl border border-wood-300/50 bg-cream-deep/30 p-4 sm:p-6"
             >
               <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-forest-900 sm:text-xl">
                 {t("contact.form.title")}
@@ -122,6 +196,7 @@ export default function ContactPage() {
                       clearError("name");
                     }}
                     aria-invalid={!!errors.name}
+                    placeholder={t("contact.form.namePlaceholder")}
                     className={inputClass(!!errors.name)}
                   />
                 </Field>
@@ -190,17 +265,68 @@ export default function ContactPage() {
                 </Field>
               </div>
 
+              {/* Anti-bot — only rendered when a site key is set
+                  (production). Local dev without the env variable
+                  skips the widget entirely, mirroring checkout. */}
+              {RECAPTCHA_SITE_KEY ? (
+                <div className="mt-5 border-t border-wood-300/40 pt-5">
+                  <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-600">
+                    {t("checkout.recaptcha.title")}
+                  </p>
+                  {/* ReCAPTCHA renders a fixed 304-px iframe Google
+                      won't let us resize. The outer div reserves the
+                      *scaled* footprint (height 78×0.85 ≈ 66) so the
+                      submit button below sits right under it; the
+                      inner applies the visual scale. Reverts to
+                      100 % at sm+. */}
+                  <div className="mt-3 h-[66px] w-[259px] sm:h-auto sm:w-auto">
+                    <div className="origin-top-left scale-[0.85] sm:scale-100">
+                      <ReCAPTCHA
+                      ref={recaptchaRef}
+                      sitekey={RECAPTCHA_SITE_KEY}
+                      hl={lang === "ar" ? "ar" : "fr"}
+                      onChange={(token) => {
+                        setRecaptchaToken(token);
+                        if (token) clearError("recaptcha");
+                      }}
+                      onExpired={() => setRecaptchaToken(null)}
+                      onErrored={() => setRecaptchaToken(null)}
+                    />
+                    </div>
+                  </div>
+                  {errors.recaptcha ? (
+                    <p
+                      role="alert"
+                      className="mt-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-red-700"
+                    >
+                      {errors.recaptcha}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {errors.form ? (
+                <p
+                  role="alert"
+                  className="mt-5 rounded-md border border-red-600/30 bg-red-600/5 px-3 py-2 font-mono text-[11px] text-red-700"
+                >
+                  {errors.form}
+                </p>
+              ) : null}
+
               <button
                 type="submit"
+                disabled={submitting}
                 className={cn(
                   "mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-tangerine-500 px-6 py-3.5",
                   "font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-cream",
                   "shadow-[0_10px_28px_-10px_rgba(234,108,29,0.55)]",
                   "transition-all duration-200 hover:-translate-y-0.5 hover:bg-tangerine-600",
-                  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40"
+                  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40",
+                  "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                 )}
               >
-                {t("contact.form.submit")}
+                {submitting ? t("contact.form.sending") : t("contact.form.submit")}
                 <ArrowRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
               </button>
             </form>
@@ -217,7 +343,6 @@ export default function ContactPage() {
                   +213 673 81 28 96
                 </span>
               }
-              note={t("contact.card.phone.hours")}
               href="tel:+213673812896"
               cta={t("contact.card.phone.cta")}
             />
@@ -236,15 +361,31 @@ export default function ContactPage() {
               icon={<MapPin className="size-5" strokeWidth={1.8} />}
               label={t("contact.card.shop.label")}
               primary={
-                <>
-                  {t("about.shop.address.line1")}
-                  <br />
-                  {t("about.shop.address.line2")}
-                </>
+                // No inner anchor — the whole ContactCard already wraps
+                // its content in an <a> pointing at mapsHref. Adding
+                // another <a> here would nest anchors (invalid HTML).
+                <span
+                  className="block"
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                >
+                  {placeLabel ? (
+                    <span className="block font-semibold">{placeLabel}</span>
+                  ) : (
+                    <>
+                      {addressLine1}
+                      {addressLine2 ? (
+                        <>
+                          <br />
+                          {addressLine2}
+                        </>
+                      ) : null}
+                    </>
+                  )}
+                </span>
               }
-              note={t("contact.card.phone.hours")}
-              href="/a-propos#notre-histoire"
+              href={mapsHref}
               cta={t("contact.card.shop.cta")}
+              external
             />
           </aside>
         </div>
@@ -341,7 +482,7 @@ function ContactCard({
         ? { target: "_blank", rel: "noopener noreferrer" }
         : null)}
       className={cn(
-        "group flex flex-col gap-3 rounded-2xl border p-5 transition-all duration-300",
+        "group flex min-w-0 flex-col gap-3 rounded-2xl border p-4 transition-all duration-300 sm:p-5",
         "hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4",
         isForest &&
           "border-forest-900 bg-forest-900 text-cream hover:bg-forest-700 focus-visible:ring-forest-900/30",

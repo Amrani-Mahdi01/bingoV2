@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 
 export type Language = "fr" | "ar";
 
@@ -15,15 +16,10 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
 
   // Top weather strip
   "strip.coords": { fr: "36.2°N · 5.4°E · SÉTIF", ar: "36.2°N · 5.4°E · سطيف" },
-  "strip.shipping": {
-    fr: "LIVRAISON GRATUITE DÈS 12 000 DA",
-    ar: "توصيل مجاني ابتداءً من 12,000 دج",
-  },
   "strip.guides": {
     fr: "GUIDES D'AUTOMNE — EN LIGNE",
     ar: "أدلة الخريف — متوفرة الآن",
   },
-  "strip.returns": { fr: "RETOURS 30 JOURS", ar: "إرجاع خلال 30 يوماً" },
   "strip.reviews": {
     fr: "AVIS INDÉPENDANTS DEPUIS 2025",
     ar: "آراء مستقلة منذ 2025",
@@ -32,6 +28,7 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   // Nav
   "nav.catalogue": { fr: "Catalogue", ar: "الكتالوج" },
   "nav.promotions": { fr: "Promotions", ar: "العروض" },
+  "nav.guides": { fr: "Guides", ar: "أدلة" },
   "nav.about": { fr: "À propos", ar: "من نحن" },
   "nav.contact": { fr: "Contact", ar: "اتصل بنا" },
   "nav.primary": { fr: "Navigation principale", ar: "التنقل الرئيسي" },
@@ -54,6 +51,7 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   "account.profile":   { fr: "Mon compte",  ar: "حسابي" },
   "account.orders":    { fr: "Mes commandes", ar: "طلباتي" },
   "account.logout":    { fr: "Déconnexion", ar: "تسجيل الخروج" },
+  "account.adminSpace": { fr: "Espace admin", ar: "لوحة الإدارة" },
   "account.signIn":    { fr: "Se connecter", ar: "تسجيل الدخول" },
   "account.register":  { fr: "Créer un compte", ar: "إنشاء حساب" },
 
@@ -149,8 +147,8 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
 
   // Categories section
   "categories.eyebrow": {
-    fr: "Catalogue · 6 collections",
-    ar: "الكتالوج · 6 مجموعات",
+    fr: "Catalogue · {n} collections",
+    ar: "الكتالوج · {n} مجموعات",
   },
   "categories.title": {
     fr: "Trouvez le matériel par catégorie",
@@ -216,8 +214,8 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   "checkout.shipping.title": { fr: "Informations de livraison", ar: "بيانات التوصيل" },
   "checkout.phone":        { fr: "Téléphone", ar: "الهاتف" },
   "checkout.phone.placeholder": {
-    fr: "+213 5XX XX XX XX",
-    ar: "0X XX XX XX XX",
+    fr: "0555 12 34 56",
+    ar: "0555 12 34 56",
   },
   "checkout.wilaya":       { fr: "Wilaya",    ar: "الولاية" },
   "checkout.commune":      { fr: "Commune",   ar: "البلدية" },
@@ -238,6 +236,24 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   },
   "checkout.error.wilaya":  { fr: "Sélectionnez une wilaya.",  ar: "اختر ولاية." },
   "checkout.error.commune": { fr: "Sélectionnez une commune.", ar: "اختر بلدية." },
+  "checkout.error.recaptcha": {
+    fr: "Confirmez que vous n'êtes pas un robot.",
+    ar: "يرجى تأكيد أنك لست روبوتاً.",
+  },
+  "checkout.error.server": {
+    fr: "Impossible d'envoyer la commande. Vérifiez votre connexion et réessayez.",
+    ar: "تعذّر إرسال الطلب. تحقّق من اتصالك وأعد المحاولة.",
+  },
+
+  // Anti-bot
+  "checkout.recaptcha.title": {
+    fr: "Vérification anti-robot",
+    ar: "التحقق من الإنسانية",
+  },
+  "checkout.recaptcha.subtitle": {
+    fr: "Cochez la case ci-dessous pour confirmer votre commande.",
+    ar: "ضع علامة في المربع أدناه لتأكيد طلبك.",
+  },
 
   // Delivery method
   "checkout.delivery.title": { fr: "Mode de livraison", ar: "طريقة التوصيل" },
@@ -249,6 +265,7 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   // Submit
   "checkout.submit":        { fr: "Confirmer la commande", ar: "تأكيد الطلب" },
   "checkout.submitShort":   { fr: "Confirmer",             ar: "تأكيد" },
+  "checkout.submitting":    { fr: "Envoi en cours…",       ar: "جارٍ الإرسال…" },
 
   // Order summary
   "checkout.summary.title":   { fr: "Votre commande",       ar: "طلبك" },
@@ -265,6 +282,7 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
     fr: "Nous vous appelons sous 24 h pour confirmer la livraison. Surveillez votre téléphone — l'équipe BINGO va vous joindre.",
     ar: "نتصل بك خلال 24 ساعة لتأكيد التوصيل. ابقَ بجوار هاتفك — سيتواصل معك فريق بينغو.",
   },
+  "checkout.success.orderNumber": { fr: "N° de commande", ar: "رقم الطلب" },
 
   // Combobox
   "combobox.noOptions": { fr: "Aucune option", ar: "لا توجد خيارات" },
@@ -279,6 +297,10 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   "product.image.prev": { fr: "Image précédente", ar: "الصورة السابقة" },
   "product.image.next": { fr: "Image suivante",   ar: "الصورة التالية" },
   "product.image.view": { fr: "Voir l'image {n}", ar: "عرض الصورة {n}" },
+  "product.image.zoom": { fr: "Agrandir l'image", ar: "تكبير الصورة" },
+  "product.image.close": { fr: "Fermer",          ar: "إغلاق" },
+  "product.video.eyebrow": { fr: "Média",            ar: "وسائط" },
+  "product.video.title":   { fr: "Vidéo du produit", ar: "فيديو المنتج" },
   "product.buyNow":     { fr: "Commander maintenant", ar: "اطلب الآن" },
   "product.similar.eyebrow": { fr: "Découvrir aussi",  ar: "اكتشف أيضاً" },
   "product.similar.title":   { fr: "Produits similaires", ar: "منتجات مشابهة" },
@@ -299,6 +321,46 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
     ar: "تصفّح الكتالوج واضغط على ♥ في أي منتج لإيجاده هنا، في أي وقت.",
   },
   "favoris.empty.cta":  { fr: "Explorer le catalogue", ar: "تصفّح الكتالوج" },
+
+  // Mes commandes (customer order history)
+  "mesCommandes.eyebrow": { fr: "Votre historique", ar: "سجلّك" },
+  "mesCommandes.title":   { fr: "Mes commandes",   ar: "طلباتي" },
+  "mesCommandes.heroEmpty": {
+    fr: "Vos commandes BINGO apparaîtront ici dès votre première achat.",
+    ar: "ستظهر طلباتك من BINGO هنا بمجرد إجراء أول عملية شراء.",
+  },
+  "mesCommandes.count.one":  { fr: "{n} commande passée.",   ar: "{n} طلب." },
+  "mesCommandes.count.many": { fr: "{n} commandes passées.", ar: "{n} طلبات." },
+  "mesCommandes.empty.title":{ fr: "Aucune commande pour le moment", ar: "لا توجد طلبات حالياً" },
+  "mesCommandes.empty.text": {
+    fr: "Quand vous passerez une commande, son statut et ses articles s'afficheront ici.",
+    ar: "عندما تقوم بطلب، ستظهر حالته ومنتجاته هنا.",
+  },
+  "mesCommandes.empty.cta": { fr: "Explorer le catalogue", ar: "تصفّح الكتالوج" },
+  "mesCommandes.loading":   { fr: "Chargement…",            ar: "جارٍ التحميل…" },
+  "mesCommandes.loadError": {
+    fr: "Impossible de charger vos commandes. Vérifiez votre connexion.",
+    ar: "تعذّر تحميل طلباتك. تحقّق من اتصالك.",
+  },
+  "mesCommandes.placedAt":  { fr: "Passée le", ar: "تم الطلب في" },
+  "mesCommandes.total":     { fr: "Total",      ar: "الإجمالي" },
+  "mesCommandes.shipping":  { fr: "Livraison",  ar: "التوصيل" },
+  "mesCommandes.items":     { fr: "Articles",   ar: "المنتجات" },
+  "mesCommandes.details":   { fr: "Détails",    ar: "التفاصيل" },
+  "mesCommandes.hideDetails": { fr: "Masquer",  ar: "إخفاء" },
+
+  // 404 — outdoor "off-trail" metaphor matches the BINGO brand.
+  "notFound.eyebrow":  { fr: "Erreur 404",                                     ar: "خطأ 404" },
+  "notFound.title":    { fr: "Hors piste.",                                    ar: "خارج المسار." },
+  "notFound.lead": {
+    fr: "Cette page s'est égarée dans la nature. Pas d'inquiétude — il suffit de revenir au sentier principal.",
+    ar: "هذه الصفحة ضاعت في البرّية. لا تقلق — يكفي العودة إلى المسار الرئيسي.",
+  },
+  "notFound.home":     { fr: "Retour à l'accueil",            ar: "العودة إلى الرئيسية" },
+  "notFound.catalogue":{ fr: "Explorer le catalogue",         ar: "تصفّح الكتالوج" },
+  "notFound.helpPrefix":{ fr: "Besoin d'aide ?",              ar: "هل تحتاج إلى مساعدة؟" },
+  "notFound.helpLink": { fr: "Contactez-nous",                ar: "اتصل بنا" },
+  "notFound.coords":   { fr: "Coordonnées perdues",           ar: "إحداثيات مفقودة" },
 
   // CGV page
   "cgv.eyebrow":  { fr: "Mentions légales",    ar: "إشعارات قانونية" },
@@ -440,8 +502,8 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   // Returns
   "faq.q.returns.1": { fr: "Comment retourner un produit ?", ar: "كيف أُرجع منتجاً؟" },
   "faq.a.returns.1": {
-    fr: "Vous avez 30 jours à compter de la réception pour nous retourner un produit non utilisé, dans son emballage d'origine. Contactez-nous pour organiser le retour.",
-    ar: "لديك 30 يوماً من تاريخ الاستلام لإرجاع منتج غير مستعمل في عبوته الأصلية. تواصل معنا لتنظيم الإرجاع.",
+    fr: "Contactez-nous pour organiser le retour d'un produit non utilisé, dans son emballage d'origine.",
+    ar: "تواصل معنا لتنظيم إرجاع منتج غير مستعمل في عبوته الأصلية.",
   },
   "faq.q.returns.2": { fr: "Mon produit est défectueux, que faire ?", ar: "منتجي معطوب، ماذا أفعل؟" },
   "faq.a.returns.2": {
@@ -506,7 +568,7 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   "login.error.emailMissing": { fr: "Votre email est requis.", ar: "البريد الإلكتروني مطلوب." },
   "login.error.emailInvalid": { fr: "Email invalide.",         ar: "البريد الإلكتروني غير صحيح." },
   "login.error.passwordMissing": { fr: "Votre mot de passe est requis.", ar: "كلمة المرور مطلوبة." },
-  "login.error.passwordShort":   { fr: "6 caractères minimum.", ar: "6 أحرف على الأقل." },
+  "login.error.passwordShort":   { fr: "8 caractères minimum.", ar: "8 أحرف على الأقل." },
 
   // Register page
   "register.brand.eyebrow": { fr: "Rejoignez la base", ar: "انضم إلى القاعدة" },
@@ -518,16 +580,18 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   },
   "register.brand.bullet1": { fr: "Nouveautés en avant-première",  ar: "الجديد بأولوية" },
   "register.brand.bullet2": { fr: "Adresses sauvegardées, commande en un clic", ar: "عناوين محفوظة، طلب بنقرة واحدة" },
-  "register.brand.bullet3": { fr: "Retours sous 30 jours, garantis", ar: "إرجاع خلال 30 يوماً، مضمون" },
+  "register.brand.bullet3": { fr: "Service après-vente humain et réactif", ar: "خدمة ما بعد البيع بشرية وسريعة" },
 
   "register.eyebrow":     { fr: "Nouveau client",      ar: "عميل جديد" },
   "register.title":       { fr: "Créer un compte",     ar: "إنشاء حساب" },
   "register.haveAccount": { fr: "Déjà un compte ?",    ar: "هل لديك حساب بالفعل؟" },
   "register.signIn":      { fr: "Se connecter",        ar: "تسجيل الدخول" },
   "register.firstName":   { fr: "Prénom",              ar: "الاسم" },
+  "register.firstNamePlaceholder": { fr: "Ex. Yacine",  ar: "مثال: ياسين" },
   "register.lastName":    { fr: "Nom",                 ar: "اللقب" },
+  "register.lastNamePlaceholder":  { fr: "Ex. Benali",  ar: "مثال: بن علي" },
   "register.confirm":     { fr: "Confirmation",        ar: "التأكيد" },
-  "register.passwordPlaceholder": { fr: "6 caractères minimum", ar: "6 أحرف على الأقل" },
+  "register.passwordPlaceholder": { fr: "8 caractères minimum", ar: "8 أحرف على الأقل" },
   "register.confirmPlaceholder":  { fr: "Retapez votre mot de passe", ar: "أعد كتابة كلمة المرور" },
   "register.acceptTermsPrefix":  { fr: "J'accepte les", ar: "أوافق على" },
   "register.acceptTermsLink":    { fr: "conditions générales de vente", ar: "الشروط والأحكام العامة للبيع" },
@@ -539,7 +603,7 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   "register.error.emailMissing": { fr: "Votre email est requis.", ar: "البريد الإلكتروني مطلوب." },
   "register.error.emailInvalid": { fr: "Email invalide.",       ar: "البريد الإلكتروني غير صحيح." },
   "register.error.passwordMissing": { fr: "Mot de passe requis.", ar: "كلمة المرور مطلوبة." },
-  "register.error.passwordShort":   { fr: "6 caractères minimum.", ar: "6 أحرف على الأقل." },
+  "register.error.passwordShort":   { fr: "8 caractères minimum.", ar: "8 أحرف على الأقل." },
   "register.error.confirmMissing":  { fr: "Veuillez confirmer le mot de passe.", ar: "يرجى تأكيد كلمة المرور." },
   "register.error.confirmMismatch": { fr: "Les mots de passe ne correspondent pas.", ar: "كلمات المرور غير متطابقة." },
   "register.error.terms": { fr: "Vous devez accepter les CGV.", ar: "يجب أن توافق على الشروط والأحكام." },
@@ -558,6 +622,7 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   "contact.form.email":   { fr: "Email",        ar: "البريد الإلكتروني" },
   "contact.form.subject": { fr: "Objet",        ar: "الموضوع" },
   "contact.form.message": { fr: "Message",      ar: "الرسالة" },
+  "contact.form.namePlaceholder":    { fr: "Ex. Yacine Benali", ar: "مثال: ياسين بن علي" },
   "contact.form.emailPlaceholder":   { fr: "vous@email.dz", ar: "you@email.dz" },
   "contact.form.subjectPlaceholder": {
     fr: "Question sur une commande, demande de conseil, …",
@@ -568,6 +633,11 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
     ar: "اشرح طلبك بالتفصيل…",
   },
   "contact.form.submit": { fr: "Envoyer le message", ar: "إرسال الرسالة" },
+  "contact.form.sending": { fr: "Envoi en cours…", ar: "جارٍ الإرسال…" },
+  "contact.error.server": {
+    fr: "Impossible d'envoyer le message. Vérifiez votre connexion et réessayez.",
+    ar: "تعذّر إرسال الرسالة. تحقّق من اتصالك وأعد المحاولة.",
+  },
 
   // Contact form validation
   "contact.error.name":         { fr: "Votre nom est requis.",       ar: "الاسم مطلوب." },
@@ -662,8 +732,8 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   },
   "about.values.support.title": { fr: "Service après-vente", ar: "خدمة ما بعد البيع" },
   "about.values.support.text": {
-    fr: "30 jours pour changer d'avis, garantie fabricant, et un humain au bout du fil.",
-    ar: "30 يوماً لتغيير رأيك، ضمان المُصنّع، وإنسان حقيقي يرد على المكالمة.",
+    fr: "Garantie fabricant et un humain au bout du fil.",
+    ar: "ضمان المُصنّع وإنسان حقيقي يرد على المكالمة.",
   },
 
   // Shop visit
@@ -790,30 +860,27 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   "footer.about.favorites":{fr: "Favoris",   ar: "المفضلة" },
   "footer.about.cgv":     { fr: "CGV",       ar: "الشروط والأحكام" },
 
-  // Trust band — 4 reassurance points
+  // Trust band — reassurance points
   "trust.aria": { fr: "Nos engagements", ar: "التزاماتنا" },
-  "trust.delivery.title": { fr: "Livraison gratuite", ar: "توصيل مجاني" },
-  "trust.delivery.text": {
-    fr: "Dès 12 000 DA partout en Algérie",
-    ar: "ابتداءً من 12,000 دج في جميع أنحاء الجزائر",
-  },
-  "trust.returns.title": {
-    fr: "Retours sous 30 jours",
-    ar: "إرجاع خلال 30 يوماً",
-  },
-  "trust.returns.text": {
-    fr: "Sans question, en boutique ou par envoi",
-    ar: "بدون أسئلة، في المتجر أو عبر الشحن",
-  },
   "trust.payment.title": { fr: "Paiement sécurisé", ar: "دفع آمن" },
   "trust.payment.text": {
-    fr: "À la livraison ou en ligne",
-    ar: "عند الاستلام أو عبر الإنترنت",
+    fr: "À la livraison, en espèces",
+    ar: "عند الاستلام، نقداً",
   },
   "trust.shop.title": { fr: "Boutique à Sétif", ar: "متجر في سطيف" },
   "trust.shop.text": {
-    fr: "36.2°N · 5.4°E — rendez-vous sur place",
-    ar: "36.2°N · 5.4°E — موعدك في المكان",
+    fr: "Conseils et essai sur place",
+    ar: "نصائح وتجربة في المتجر",
+  },
+  "trust.delivery.title": { fr: "Livraison 58 wilayas", ar: "التوصيل لـ 58 ولاية" },
+  "trust.delivery.text": {
+    fr: "48 à 72 h dans la plupart des régions",
+    ar: "بين 48 و72 ساعة في أغلب المناطق",
+  },
+  "trust.returns.title": { fr: "Retours simples", ar: "إرجاع بسيط" },
+  "trust.returns.text": {
+    fr: "Produit non utilisé, dans son emballage",
+    ar: "منتج غير مستعمل في عبوته الأصلية",
   },
 
   // Collection CTA — bottom of homepage
@@ -833,16 +900,20 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
 
   // Promotions banner
   "promo.eyebrow": {
-    fr: "Offre limitée · Octobre",
-    ar: "عرض محدود · أكتوبر",
+    fr: "Promotions en cours",
+    ar: "العروض الجارية",
   },
-  "promo.title": {
-    fr: "Jusqu'à −30 % sur la collection automne",
-    ar: "خصم يصل إلى 30٪ على تشكيلة الخريف",
+  "promo.title.withDiscount": {
+    fr: "Jusqu'à −{discount} % sur notre sélection",
+    ar: "خصم يصل إلى {discount}٪ على تشكيلتنا",
+  },
+  "promo.title.countOnly": {
+    fr: "Notre sélection en promotion",
+    ar: "تشكيلتنا في العروض",
   },
   "promo.subtitle": {
-    fr: "Sacs de couchage, hardshells et sacs à dos — notre meilleure sélection est en promo jusqu'à fin octobre. Livraison gratuite dès 12 000 DA.",
-    ar: "أكياس نوم، جاكيتات مقاومة للماء، وحقائب — أفضل اختياراتنا في عرض حتى نهاية أكتوبر. توصيل مجاني ابتداءً من 12,000 دج.",
+    fr: "{count} produits actuellement en promotion dans le catalogue — sélection mise à jour en temps réel.",
+    ar: "{count} منتجاً في العروض حالياً في الكتالوج — تحديث التشكيلة في الوقت الفعلي.",
   },
   "promo.cta": { fr: "Voir les promotions", ar: "اطلع على العروض" },
 
@@ -896,6 +967,15 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   "cart.increase": { fr: "Augmenter la quantité", ar: "زيادة الكمية" },
   "cart.remove": { fr: "Supprimer l'article", ar: "حذف العنصر" },
   "cart.qty": { fr: "Quantité", ar: "الكمية" },
+  "cart.pageTitle": { fr: "Mon panier", ar: "سلتي" },
+  "cart.continue": { fr: "Continuer mes achats", ar: "متابعة التسوق" },
+  "cart.emptyHint": {
+    fr: "Ajoutez du matériel depuis le catalogue pour commencer.",
+    ar: "أضف منتجات من الكتالوج للبدء.",
+  },
+  "cart.discoverCta": { fr: "Découvrir la collection", ar: "اكتشف المجموعة" },
+  "cart.itemsCount.one": { fr: "1 article", ar: "عنصر واحد" },
+  "cart.itemsCount.many": { fr: "{n} articles", ar: "{n} عناصر" },
 };
 
 type TranslateVars = Record<string, string | number>;
@@ -919,45 +999,66 @@ function applyVars(str: string, vars?: TranslateVars): string {
 
 const LanguageContext = React.createContext<Ctx | null>(null);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = React.useState<Language>("fr");
+export function LanguageProvider({
+  children,
+  initialLang,
+}: {
+  children: React.ReactNode;
+  /** Server-resolved locale (from the URL via middleware). The URL is the
+   *  single source of truth — there is no localStorage-driven auto-switch,
+   *  which keeps SSR and the address bar in sync for SEO. */
+  initialLang?: Language;
+}) {
+  const pathname = usePathname();
 
-  // Hydrate from localStorage on mount (client-only)
-  React.useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY) as Language | null;
-      if (stored === "fr" || stored === "ar") setLangState(stored);
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  // The admin backoffice is French-only / LTR by design — strings,
+  // tables and form layouts are tuned for that. Force `fr` for any
+  // /admin route; the storefront otherwise follows the URL locale.
+  const isAdminRoute = pathname?.startsWith("/admin") ?? false;
+  const effectiveLang: Language = isAdminRoute ? "fr" : initialLang ?? "fr";
 
-  // Sync <html lang> and dir attributes whenever lang changes
+  // Keep <html lang>/<dir> in sync on client-side (soft) navigations.
+  // The server already sets the correct values on first paint.
   React.useEffect(() => {
     const html = document.documentElement;
-    html.setAttribute("lang", lang);
-    html.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
-  }, [lang]);
+    html.setAttribute("lang", effectiveLang);
+    html.setAttribute("dir", effectiveLang === "ar" ? "rtl" : "ltr");
+  }, [effectiveLang]);
 
+  // Switching language navigates to the same page under the other locale
+  // (FR = clean path, AR = /ar prefix), preserving query + hash. We use a
+  // FULL reload (not a soft router.push): the locale is resolved in the
+  // shared root layout from a request header, which a soft navigation
+  // won't re-run — so a hard navigation is what actually re-renders the
+  // whole page in the new language + RTL/LTR direction. We also remember
+  // the choice in a cookie for potential future use.
   const setLang = React.useCallback((next: Language) => {
-    setLangState(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
+      document.cookie = `${STORAGE_KEY}=${next};path=/;max-age=31536000;samesite=lax`;
     } catch {
       /* ignore */
     }
+    const rest = window.location.pathname.replace(/^\/ar(?=\/|$)/, "") || "/";
+    const target = next === "ar" ? (rest === "/" ? "/ar" : `/ar${rest}`) : rest;
+    window.location.assign(
+      `${target}${window.location.search}${window.location.hash}`
+    );
   }, []);
 
   const t = React.useCallback(
     (key: string, vars?: TranslateVars) => {
       const entry = TRANSLATIONS[key];
       if (!entry) return applyVars(key, vars);
-      return applyVars(entry[lang] ?? entry.fr, vars);
+      return applyVars(entry[effectiveLang] ?? entry.fr, vars);
     },
-    [lang]
+    [effectiveLang]
   );
 
-  const value = React.useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
+  const value = React.useMemo(
+    () => ({ lang: effectiveLang, setLang, t }),
+    [effectiveLang, setLang, t],
+  );
   return (
     <LanguageContext.Provider value={value}>
       {children}

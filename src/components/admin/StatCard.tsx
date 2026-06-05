@@ -29,22 +29,24 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "relative flex flex-col rounded-md border border-zinc-200 bg-white p-5",
+        "relative flex flex-col rounded-md border border-zinc-200 bg-white p-4 sm:p-5",
         className
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-zinc-500">{label}</p>
+        <p className="text-[11px] font-medium text-zinc-500 sm:text-xs">
+          {label}
+        </p>
         <Icon className="size-4 text-zinc-400" strokeWidth={1.75} />
       </div>
-      <div className="mt-3 flex items-baseline gap-2">
-        <p className="text-3xl font-semibold leading-none tracking-tight tabular-nums text-zinc-900">
+      <div className="mt-2 flex items-baseline gap-2 sm:mt-3">
+        <p className="text-xl font-semibold leading-none tracking-tight tabular-nums text-zinc-900 sm:text-3xl">
           {value}
         </p>
         {typeof change === "number" ? (
           <span
             className={cn(
-              "inline-flex items-center gap-0.5 text-xs font-medium tabular-nums",
+              "inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums sm:text-xs",
               isPositive ? "text-emerald-600" : "text-red-600"
             )}
           >
@@ -58,7 +60,9 @@ export function StatCard({
         ) : null}
       </div>
       {subtitle ? (
-        <p className="mt-1.5 text-xs text-zinc-500">{subtitle}</p>
+        <p className="mt-1 text-[11px] text-zinc-500 sm:mt-1.5 sm:text-xs">
+          {subtitle}
+        </p>
       ) : null}
       {children ? <div className="mt-3">{children}</div> : null}
     </div>

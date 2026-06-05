@@ -48,6 +48,13 @@ export const categoriesApi = {
       .then((r) => r.data);
   },
 
+  /** Public — top-level categories with their direct children, active only. */
+  listPublic(opts: { signal?: AbortSignal } = {}): Promise<ApiCategory[]> {
+    return http
+      .get<ListResponse>("/api/categories", { auth: "none", signal: opts.signal })
+      .then((r) => r.data);
+  },
+
   create(payload: CategoryPayload): Promise<ApiCategory> {
     return http
       .post<SingleResponse>("/api/admin/categories", payload, { auth: "admin" })
@@ -60,8 +67,11 @@ export const categoriesApi = {
       .then((r) => r.data);
   },
 
-  destroy(id: string): Promise<void> {
-    return http.delete(`/api/admin/categories/${id}`, { auth: "admin" }) as Promise<void>;
+  destroy(id: string, opts: { cascade?: boolean } = {}): Promise<void> {
+    const qs = opts.cascade ? "?cascade=1" : "";
+    return http.delete(`/api/admin/categories/${id}${qs}`, {
+      auth: "admin",
+    }) as Promise<void>;
   },
 
   move(id: string, direction: "up" | "down"): Promise<void> {

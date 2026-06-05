@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
 import {
   ArrowRight,
   ChevronRight,
@@ -16,6 +16,8 @@ import {
 
 import { TentLink } from "@/components/ui/tent-link";
 import { useLanguage } from "@/lib/i18n";
+import { toMapsEmbedUrl } from "@/lib/site-contact";
+import { useSiteContact } from "@/lib/site-contact-context";
 
 export default function AboutPage() {
   return (
@@ -206,7 +208,17 @@ function Values() {
 
 /* ───── Shop visit — address + hours + phone ─────────────────── */
 function ShopVisit() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const siteContact = useSiteContact();
+  const addressLine =
+    (lang === "ar" ? siteContact.addressAr : siteContact.addressFr) ||
+    t("about.shop.address.line1");
+  const mapsHref = siteContact.mapsUrl;
+  // Build an iframe-friendly embed URL from the admin-pasted share link
+  // (parses out the @lat,lng segment). Falls back to a `q=<address>`
+  // query when no URL is configured, so the map still renders something
+  // sensible. Null only if both fields are empty.
+  const mapsEmbed = toMapsEmbedUrl(siteContact.mapsUrl, addressLine);
   return (
     <section
       aria-labelledby="shop-title"
@@ -255,9 +267,24 @@ function ShopVisit() {
 
           <dl className="mt-8 space-y-4">
             <InfoRow Icon={MapPin} label={t("about.shop.address.label")}>
-              {t("about.shop.address.line1")}
-              <br />
-              {t("about.shop.address.line2")}
+              {mapsHref ? (
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${addressLine} — Google Maps`}
+                  className="inline-block underline-offset-4 transition-colors hover:text-tangerine-300 hover:underline"
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                >
+                  {addressLine}
+                </a>
+              ) : (
+                <>
+                  {addressLine}
+                  <br />
+                  {t("about.shop.address.line2")}
+                </>
+              )}
             </InfoRow>
             <InfoRow Icon={Phone} label={t("about.shop.phone.label")}>
               <a
@@ -271,24 +298,52 @@ function ShopVisit() {
           </dl>
         </div>
 
-        {/* Map placeholder */}
+        {/* Embedded Google Map — URL comes from /admin/contacts
+            (`contact.maps_url`). Falls back to the photo placeholder
+            only when neither a maps URL nor an address is configured. */}
         <div className="relative aspect-[5/4] overflow-hidden rounded-2xl bg-forest-800 ring-1 ring-inset ring-cream/10 md:aspect-[4/3]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1400&q=85&fit=crop"
-            alt={t("about.shop.imageAlt")}
-            className="absolute inset-0 size-full object-cover opacity-70"
-            loading="lazy"
-          />
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-linear-to-t from-forest-900/80 via-forest-900/30 to-transparent"
-          />
-          <div className="absolute inset-0 grid place-items-center">
-            <span className="inline-grid size-14 place-items-center rounded-full bg-tangerine-500 text-cream shadow-[0_10px_28px_-10px_rgba(234,108,29,0.6)]">
-              <MapPin className="size-6" strokeWidth={1.8} />
-            </span>
-          </div>
+          {mapsEmbed ? (
+            <iframe
+              src={mapsEmbed}
+              title={`${t("about.shop.address.label")} — Google Maps`}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+              className="absolute inset-0 size-full border-0"
+            />
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=1400&q=85&fit=crop"
+                alt={t("about.shop.imageAlt")}
+                className="absolute inset-0 size-full object-cover opacity-70"
+                loading="lazy"
+              />
+              <div
+                aria-hidden
+                className="absolute inset-0 bg-linear-to-t from-forest-900/80 via-forest-900/30 to-transparent"
+              />
+              <div className="absolute inset-0 grid place-items-center">
+                <span className="inline-grid size-14 place-items-center rounded-full bg-tangerine-500 text-cream shadow-[0_10px_28px_-10px_rgba(234,108,29,0.6)]">
+                  <MapPin className="size-6" strokeWidth={1.8} />
+                </span>
+              </div>
+            </>
+          )}
+          {/* Floating link on top of the embed so visitors can jump
+              into the full Google Maps interface in a new tab. */}
+          {mapsHref ? (
+            <a
+              href={mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute end-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-cream/95 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-forest-900 shadow transition-colors hover:bg-cream"
+            >
+              <MapPin className="size-3" strokeWidth={2} />
+              {t("contact.card.shop.cta")}
+            </a>
+          ) : null}
         </div>
       </div>
     </section>

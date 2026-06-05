@@ -119,11 +119,11 @@ export function DashboardKpis({ stats }: Props) {
 
       {/* Revenue + orders side-by-side */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
+        <div className="rounded-md border border-zinc-200 bg-white p-4 sm:p-5">
           <div className="mb-3 flex items-baseline justify-between">
             <div>
               <Mono className="text-zinc-500">Chiffre d&apos;affaires</Mono>
-              <h3 className="mt-0.5 font-sans text-lg font-semibold text-zinc-900">
+              <h3 className="mt-0.5 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
                 Évolution sur 30 jours
               </h3>
             </div>
@@ -133,10 +133,10 @@ export function DashboardKpis({ stats }: Props) {
           </div>
           <RevenueAreaChart data={series} />
         </div>
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
+        <div className="rounded-md border border-zinc-200 bg-white p-4 sm:p-5">
           <div className="mb-3">
             <Mono className="text-zinc-500">Volume</Mono>
-            <h3 className="mt-0.5 font-sans text-lg font-semibold text-zinc-900">
+            <h3 className="mt-0.5 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
               Commandes par jour
             </h3>
           </div>
@@ -161,16 +161,16 @@ export function DashboardKpis({ stats }: Props) {
 
       {/* Funnel + side-by-side top lists */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
+        <div className="rounded-md border border-zinc-200 bg-white p-4 sm:p-5">
           <Mono className="text-zinc-500">Entonnoir</Mono>
-          <h3 className="mt-0.5 mb-4 font-sans text-lg font-semibold text-zinc-900">
+          <h3 className="mt-0.5 mb-4 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
             Du panier à la livraison
           </h3>
           <Funnel steps={funnel} />
         </div>
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
+        <div className="rounded-md border border-zinc-200 bg-white p-4 sm:p-5">
           <Mono className="text-zinc-500">Wilayas</Mono>
-          <h3 className="mt-0.5 mb-4 font-sans text-lg font-semibold text-zinc-900">
+          <h3 className="mt-0.5 mb-4 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
             Top wilayas — chiffre d&apos;affaires
           </h3>
           {topWilayas.length === 0 ? (
@@ -185,9 +185,9 @@ export function DashboardKpis({ stats }: Props) {
       </div>
 
       {/* Top products */}
-      <div className="rounded-md border border-zinc-200 bg-white p-5">
+      <div className="rounded-md border border-zinc-200 bg-white p-4 sm:p-5">
         <Mono className="text-zinc-500">Catalogue</Mono>
-        <h3 className="mt-0.5 mb-4 font-sans text-lg font-semibold text-zinc-900">
+        <h3 className="mt-0.5 mb-4 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
           Top produits — chiffre d&apos;affaires sur 30 jours
         </h3>
         {topProductsBars.length === 0 ? (

@@ -346,3 +346,23 @@
 }
 
 /* admin scope appended */
+
+/* Slim cream/wood scrollbar for in-app scroll areas (popups, recap lists). */
+.scrollbar-cream {
+  scrollbar-width: thin;
+  scrollbar-color: #c9b58e transparent;
+}
+.scrollbar-cream::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-cream::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-cream::-webkit-scrollbar-thumb {
+  background-color: #c9b58e;
+  border-radius: 9999px;
+}
+.scrollbar-cream::-webkit-scrollbar-thumb:hover {
+  background-color: #b89e72;
+}

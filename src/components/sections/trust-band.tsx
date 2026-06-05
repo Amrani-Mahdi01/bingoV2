@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   MapPin,
-  RotateCcw,
+  PackageCheck,
   ShieldCheck,
   Truck,
   type LucideIcon,
@@ -15,19 +15,19 @@ type Feature = { Icon: LucideIcon; titleKey: string; textKey: string };
 
 const FEATURES: Feature[] = [
   {
+    Icon: ShieldCheck,
+    titleKey: "trust.payment.title",
+    textKey: "trust.payment.text",
+  },
+  {
     Icon: Truck,
     titleKey: "trust.delivery.title",
     textKey: "trust.delivery.text",
   },
   {
-    Icon: RotateCcw,
+    Icon: PackageCheck,
     titleKey: "trust.returns.title",
     textKey: "trust.returns.text",
-  },
-  {
-    Icon: ShieldCheck,
-    titleKey: "trust.payment.title",
-    textKey: "trust.payment.text",
   },
   {
     Icon: MapPin,
@@ -48,7 +48,7 @@ export function TrustBand() {
       className="border-y border-wood-300/40 bg-cream-deep/40 py-10 sm:py-12 md:py-14"
     >
       <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
-        <ul className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4 sm:gap-x-8">
+        <ul className="grid grid-cols-2 gap-x-6 gap-y-8 sm:gap-x-8 md:grid-cols-4">
           {FEATURES.map(({ Icon, titleKey, textKey }) => (
             <li
               key={titleKey}

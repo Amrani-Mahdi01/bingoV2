@@ -9,12 +9,57 @@ export type Product = {
   image: string;
   /** Optional multi-image gallery for the product slider. Defaults to [image]. */
   images?: string[];
+  /** Optional product video (absolute URL), at most one per product. */
+  video?: string;
   /** Category slug — used by the catalogue filters. */
   categorySlug?: string;
   description: string;
   /** Arabic description. Falls back to `description` when missing. */
   descriptionAr?: string;
   features: string[];
+  /** Top-level stock (used when the product has no variants). When
+   *  `trackStock === false` the product is always considered in
+   *  stock. When `allowBackorder === true` it stays orderable even
+   *  with stock at 0. */
+  stock?: number;
+  trackStock?: boolean;
+  allowBackorder?: boolean;
+  /** Color / size variants (when present, the details page renders
+   *  pickers and the price/stock derive from the selected variant). */
+  variants?: ProductVariant[];
+};
+
+/**
+ * Single source of truth for "can this product be ordered right now?".
+ * If a variant is selected, its stock takes priority over the
+ * top-level number (variants are the per-SKU layer). Untracked or
+ * backorder-friendly products are never out of stock. Mirrors the
+ * same rule used by the backend `/api/products` adapter.
+ */
+export function isProductOutOfStock(
+  product: Pick<Product, "stock" | "trackStock" | "allowBackorder">,
+  selectedVariant?: { stock: number } | null,
+): boolean {
+  if (selectedVariant) return selectedVariant.stock <= 0;
+  if (product.trackStock === false) return false;
+  if (product.allowBackorder) return false;
+  // `stock` is optional on the legacy mock catalogue — undefined means
+  // "no tracking", which is treated as in-stock.
+  if (product.stock == null) return false;
+  return product.stock <= 0;
+}
+
+export type ProductVariant = {
+  id: string;
+  colorNameFr: string | null;
+  colorNameAr: string | null;
+  colorHex: string | null;
+  sizeLabel: string | null;
+  /** Added to `Product.price` when this variant is the selected one. */
+  priceDelta: number;
+  stock: number;
+  skuSuffix: string | null;
+  displayOrder: number;
 };
 
 export const PRODUCTS: Product[] = [
@@ -494,6 +539,57 @@ export const PRODUCTS: Product[] = [
 
 export function getProduct(slug: string): Product | null {
   return PRODUCTS.find((p) => p.slug === slug) ?? null;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Product → sub-category mapping.
+   Kept as a side-table (rather than a field on each Product
+   entry) to avoid touching the 29 product records every time the
+   sub-category taxonomy is tweaked. The catalogue filter looks
+   up here; products not present here simply aren't filtered by
+   sub-category and fall through on the parent category match.
+   ───────────────────────────────────────────────────────────── */
+export const PRODUCT_SUBCATEGORY: Record<string, string> = {
+  // sacs-de-couchage
+  "marmot-lithium-0": "duvet",
+  "marmot-trestles-30": "synthetique",
+  "sea-to-summit-trek-tkii": "duvet",
+  "therm-a-rest-hyperion": "duvet",
+  // tentes
+  "msr-hubba-nx": "ultralegeres",
+  "big-agnes-copper-spur": "ultralegeres",
+  "nemo-hornet-elite-2p": "ultralegeres",
+  "coleman-sundome-4": "familiales",
+  // sacs-a-dos
+  "osprey-atmos-65": "trek",
+  "gregory-baltoro-65": "trek",
+  "deuter-aircontact-core": "trek",
+  "osprey-talon-22": "journee",
+  // eclairage
+  "petzl-actik-core": "frontales",
+  "black-diamond-spot-400": "frontales",
+  "biolite-headlamp-425": "frontales",
+  "goal-zero-lighthouse-mini": "lanternes",
+  // navigation
+  "leatherman-wave": "couteaux",
+  "victorinox-camper": "couteaux",
+  "suunto-mc-2": "boussoles",
+  "garmin-gpsmap-67": "boussoles",
+  // campement (note: "hydratation" slug exists under both campement
+  // and sacs-a-dos — they're distinguished by the parent category)
+  "jetboil-flash": "cuisine",
+  "msr-pocketrocket-2": "cuisine",
+  "primus-omnilite-ti": "cuisine",
+  "biolite-campstove-2": "cuisine",
+  "sea-to-summit-x-cup": "cuisine",
+  "hydro-flask-1l": "hydratation",
+  "nalgene-wide-mouth-1l": "hydratation",
+  "klean-kanteen-32oz": "hydratation",
+  // patagonia-torrentshell: campement, no matching sub — left out
+};
+
+export function getProductSubCategory(slug: string): string | null {
+  return PRODUCT_SUBCATEGORY[slug] ?? null;
 }
 
 export const formatDA = (value: number) =>

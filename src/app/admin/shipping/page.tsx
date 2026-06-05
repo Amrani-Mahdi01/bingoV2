@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { MapPin, Plus, Search, Trash2 } from "lucide-react";
+import { MapPin, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,10 +31,29 @@ import {
   type CommuneCreate,
   type WilayaCreate,
 } from "@/lib/api/wilayas";
+import { zrApi } from "@/lib/api/zr";
 import { cn } from "@/lib/utils";
 import type { Commune, Wilaya, WilayaRegion } from "@/lib/types";
 
 const REGIONS: WilayaRegion[] = ["Nord", "Centre", "Est", "Ouest", "Sud"];
+
+/* ─── Form validation regexes ────────────────────────────────────
+   Shared by both NewWilayaDialog and CommunesDialog. The backend
+   re-validates everything; these mirror the user-facing constraints
+   so we can show inline errors instead of waiting for the server. */
+// Wilaya code: 1 or 2 digits (we pad to 2 on save). "0" / "00" are
+// rejected by the parseInt check at the call site.
+const CODE_RE = /^[0-9]{1,2}$/;
+// Algerian postal codes are 5 digits, but admin refs can vary
+// (4-digit older codes, 6-digit composite). Permissive 4–6.
+const POSTAL_RE = /^[0-9]{4,6}$/;
+// FR name: 2–100 chars, must contain at least one Latin letter
+// (covers Basic Latin + Latin-1 Supplement + Latin Extended-A).
+const NAME_FR_RE = /^(?=.*[A-Za-zÀ-ſ])[\s\S]{2,100}$/;
+// AR name: 2–100 chars, must contain at least one Arabic letter.
+const NAME_AR_RE = /^(?=.*[؀-ۿݐ-ݿ])[\s\S]{2,100}$/;
+// Non-negative integer (allows "0"). For shipping price / days.
+const POS_INT_RE = /^(0|[1-9][0-9]*)$/;
 type RegionFilter = WilayaRegion | "all";
 
 function extractMessage(err: unknown, fallback: string): string {
@@ -51,7 +71,11 @@ function extractMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-type Draft = { shippingPrice: string; deliveryDays: string };
+type Draft = {
+  shippingPrice: string; // home delivery
+  stopDeskPrice: string; // point-relais
+  deliveryDays: string;
+};
 
 export default function ShippingPage() {
   const [list, setList] = React.useState<Wilaya[] | null>(null);
@@ -60,6 +84,8 @@ export default function ShippingPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [region, setRegion] = React.useState<RegionFilter>("all");
+  const [importing, setImporting] = React.useState(false);
+  const confirm = useConfirm();
 
   const reload = React.useCallback(async () => {
     try {
@@ -69,6 +95,7 @@ export default function ShippingPage() {
       for (const w of data) {
         next[w.id] = {
           shippingPrice: String(w.shippingPrice),
+          stopDeskPrice: String(w.stopDeskPrice),
           deliveryDays: String(w.deliveryDays),
         };
       }
@@ -83,6 +110,30 @@ export default function ShippingPage() {
     }
   }, []);
 
+  // Import wilayas + communes (+ prices) straight from ZR Express, then
+  // refresh the table — so the admin never has to leave /shipping.
+  const importFromZr = async () => {
+    const ok = await confirm({
+      title: "Importer les territoires depuis ZR Express ?",
+      message:
+        "Les wilayas et communes seront remplacées par celles de ZR Express et " +
+        "les tarifs mis à jour depuis ZR. Les modifications de prix non " +
+        "enregistrées seront perdues.",
+      confirmLabel: "Importer",
+    });
+    if (!ok) return;
+    setImporting(true);
+    try {
+      const res = await zrApi.syncTerritories();
+      toast.success(res.message ?? "Territoires importés depuis ZR Express.");
+      await reload();
+    } catch (err) {
+      toast.error(extractMessage(err, "Échec de l'import depuis ZR Express."));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   React.useEffect(() => {
     void reload();
   }, [reload]);
@@ -93,6 +144,7 @@ export default function ShippingPage() {
       if (!d) return false;
       return (
         d.shippingPrice !== String(w.shippingPrice) ||
+        d.stopDeskPrice !== String(w.stopDeskPrice) ||
         d.deliveryDays !== String(w.deliveryDays)
       );
     },
@@ -102,7 +154,10 @@ export default function ShippingPage() {
   const setDraftField = (id: string, key: keyof Draft, value: string) =>
     setDrafts((prev) => ({
       ...prev,
-      [id]: { ...(prev[id] ?? { shippingPrice: "", deliveryDays: "" }), [key]: value },
+      [id]: {
+        ...(prev[id] ?? { shippingPrice: "", stopDeskPrice: "", deliveryDays: "" }),
+        [key]: value,
+      },
     }));
 
   const filtered = React.useMemo(() => {
@@ -132,10 +187,13 @@ export default function ShippingPage() {
     for (const w of dirtyRows) {
       const d = drafts[w.id];
       const shippingPrice = parseInt(d.shippingPrice, 10);
+      const stopDeskPrice = parseInt(d.stopDeskPrice, 10);
       const deliveryDays = parseInt(d.deliveryDays, 10);
       if (
         !Number.isFinite(shippingPrice) ||
         shippingPrice < 0 ||
+        !Number.isFinite(stopDeskPrice) ||
+        stopDeskPrice < 0 ||
         !Number.isFinite(deliveryDays) ||
         deliveryDays < 1
       ) {
@@ -143,7 +201,11 @@ export default function ShippingPage() {
         continue;
       }
       try {
-        const updated = await wilayasApi.update(w.id, { shippingPrice, deliveryDays });
+        const updated = await wilayasApi.update(w.id, {
+          shippingPrice,
+          stopDeskPrice,
+          deliveryDays,
+        });
         setList((prev) =>
           prev ? prev.map((row) => (row.id === w.id ? updated : row)) : prev
         );
@@ -151,6 +213,7 @@ export default function ShippingPage() {
           ...prev,
           [w.id]: {
             shippingPrice: String(updated.shippingPrice),
+            stopDeskPrice: String(updated.stopDeskPrice),
             deliveryDays: String(updated.deliveryDays),
           },
         }));
@@ -170,6 +233,7 @@ export default function ShippingPage() {
     for (const w of list) {
       next[w.id] = {
         shippingPrice: String(w.shippingPrice),
+        stopDeskPrice: String(w.stopDeskPrice),
         deliveryDays: String(w.deliveryDays),
       };
     }
@@ -197,22 +261,18 @@ export default function ShippingPage() {
       <AdminPageHeader
         eyebrow="Logistique"
         title="Livraison"
-        subtitle="Tarifs et délais par wilaya. Filtrez, modifiez, puis enregistrez l'ensemble en une fois."
+        subtitle="Tarifs et délais par wilaya. Les territoires (wilayas et communes) sont importés depuis ZR Express ; modifiez les prix puis enregistrez."
         actions={
-          <NewWilayaDialog
-            onCreated={(w) => {
-              setList((prev) => (prev ? [...prev, w] : [w]));
-              setDrafts((prev) => ({
-                ...prev,
-                [w.id]: {
-                  shippingPrice: String(w.shippingPrice),
-                  deliveryDays: String(w.deliveryDays),
-                },
-              }));
-              setRegion(w.region);
-              setSearch("");
-            }}
-          />
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => void importFromZr()}
+            disabled={importing}
+          >
+            <RefreshCw className={cn("size-3.5", importing && "animate-spin")} />
+            {importing ? "Import en cours…" : "Importer depuis ZR Express"}
+          </Button>
         }
       />
 
@@ -285,14 +345,110 @@ export default function ShippingPage() {
             dirtyRows.length > 0 && "pb-20"
           )}
         >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
+          {/* Mobile (< md): card list — desktop's 7-column table doesn't
+              fit on a phone, so each wilaya becomes a card with the
+              same editable fields stacked. */}
+          <ul className="divide-y divide-zinc-100 md:hidden">
+            {filtered.map((w) => {
+              const d = drafts[w.id] ?? {
+                shippingPrice: String(w.shippingPrice),
+                stopDeskPrice: String(w.stopDeskPrice),
+                deliveryDays: String(w.deliveryDays),
+              };
+              const dirty = isDirty(w);
+              return (
+                <li
+                  key={w.id}
+                  className={cn(
+                    "flex flex-col gap-2.5 px-3 py-3",
+                    dirty && "border-l-2 border-l-amber-400 bg-amber-50/40",
+                  )}
+                >
+                  {/* Header — code badge + FR/AR name + region pill. */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <span className="mt-0.5 shrink-0 rounded-full bg-zinc-100 px-1.5 py-0 font-mono text-[10px] text-zinc-600">
+                        #{w.code}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-zinc-900">
+                          {w.name}
+                        </p>
+                        <p
+                          className="truncate text-[10px] text-zinc-500"
+                          dir="rtl"
+                          lang="ar"
+                        >
+                          {w.nameAr}
+                        </p>
+                      </div>
+                    </div>
+                    <RegionChip region={w.region} />
+                  </div>
+
+                  {/* Editable fields — label/value rows. Each input gets
+                      a fixed width (~104px) so they all line up vertically
+                      on the right edge, which makes the prices easy to
+                      compare across rows. */}
+                  <dl className="flex flex-col gap-1.5">
+                    <ShippingField
+                      label="Domicile"
+                      value={d.shippingPrice}
+                      onChange={(v) => setDraftField(w.id, "shippingPrice", v)}
+                      suffix="DZD"
+                      min={0}
+                      max={100000}
+                      step={50}
+                      ariaLabel={`Prix domicile ${w.name}`}
+                      disabled={bulkSaving}
+                    />
+                    <ShippingField
+                      label="Point relais"
+                      value={d.stopDeskPrice}
+                      onChange={(v) => setDraftField(w.id, "stopDeskPrice", v)}
+                      suffix="DZD"
+                      min={0}
+                      max={100000}
+                      step={50}
+                      ariaLabel={`Prix point relais ${w.name}`}
+                      disabled={bulkSaving}
+                    />
+                    <ShippingField
+                      label="Délai"
+                      value={d.deliveryDays}
+                      onChange={(v) => setDraftField(w.id, "deliveryDays", v)}
+                      suffix="j"
+                      min={1}
+                      max={30}
+                      step={1}
+                      ariaLabel={`Délai ${w.name}`}
+                      disabled={bulkSaving}
+                    />
+                  </dl>
+
+                  <div className="flex justify-end">
+                    <CommunesDialog wilaya={w} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[820px] border-collapse text-sm">
               <thead className="sticky top-0 z-10 bg-zinc-50">
                 <tr className="border-b border-zinc-200 text-left text-2xs uppercase tracking-wide text-zinc-600">
                   <th className="px-4 py-2.5 font-medium">#</th>
                   <th className="px-4 py-2.5 font-medium">Wilaya</th>
                   <th className="px-4 py-2.5 font-medium">Région</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Prix livraison</th>
+                  <th className="px-4 py-2.5 font-medium text-right">
+                    Domicile
+                    <span className="ms-1 font-normal text-zinc-400">DZD</span>
+                  </th>
+                  <th className="px-4 py-2.5 font-medium text-right">
+                    Point relais
+                    <span className="ms-1 font-normal text-zinc-400">DZD</span>
+                  </th>
                   <th className="px-4 py-2.5 font-medium text-right">Délai</th>
                   <th className="px-4 py-2.5 font-medium text-right">Communes</th>
                 </tr>
@@ -301,6 +457,7 @@ export default function ShippingPage() {
                 {filtered.map((w) => {
                   const d = drafts[w.id] ?? {
                     shippingPrice: String(w.shippingPrice),
+                    stopDeskPrice: String(w.stopDeskPrice),
                     deliveryDays: String(w.deliveryDays),
                   };
                   const dirty = isDirty(w);
@@ -338,7 +495,20 @@ export default function ShippingPage() {
                           max={100000}
                           step={50}
                           width="w-28"
-                          ariaLabel={`Prix livraison ${w.name}`}
+                          ariaLabel={`Prix domicile ${w.name}`}
+                          disabled={bulkSaving}
+                        />
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <FieldWithSuffix
+                          value={d.stopDeskPrice}
+                          onChange={(v) => setDraftField(w.id, "stopDeskPrice", v)}
+                          suffix="DZD"
+                          min={0}
+                          max={100000}
+                          step={50}
+                          width="w-28"
+                          ariaLabel={`Prix point relais ${w.name}`}
                           disabled={bulkSaving}
                         />
                       </td>
@@ -407,6 +577,24 @@ export default function ShippingPage() {
 }
 
 /* ───── Small UI helpers ───── */
+
+/** Tiny inline error message shown under an invalid form input —
+ *  red dot + text, dismissed automatically as the field is edited. */
+function InlineErr({ message }: { message: string | undefined }) {
+  if (!message) return null;
+  return (
+    <p
+      role="alert"
+      className="mt-1 flex items-center gap-1 text-2xs font-medium text-red-600"
+    >
+      <span
+        aria-hidden
+        className="inline-block size-1 rounded-full bg-red-600"
+      />
+      {message}
+    </p>
+  );
+}
 
 function RegionPill({
   active,
@@ -503,6 +691,44 @@ function FieldWithSuffix({
   );
 }
 
+/** Mobile label/value row used inside the shipping cards. Lays the
+ *  field name on the left and the editable number + suffix on the
+ *  right, with a fixed input width so prices line up across the list.
+ *  Built on top of FieldWithSuffix so validation + keyboard behaviour
+ *  stay identical to the desktop table. */
+function ShippingField(props: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  suffix: string;
+  min: number;
+  max: number;
+  step: number;
+  ariaLabel: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+        {props.label}
+      </dt>
+      <dd>
+        <FieldWithSuffix
+          value={props.value}
+          onChange={props.onChange}
+          suffix={props.suffix}
+          min={props.min}
+          max={props.max}
+          step={props.step}
+          width="w-24"
+          ariaLabel={props.ariaLabel}
+          disabled={props.disabled}
+        />
+      </dd>
+    </div>
+  );
+}
+
 function NewWilayaDialog({
   onCreated,
 }: {
@@ -514,8 +740,21 @@ function NewWilayaDialog({
   const [nameAr, setNameAr] = React.useState("");
   const [region, setRegion] = React.useState<WilayaRegion>("Nord");
   const [shippingPrice, setShippingPrice] = React.useState("600");
+  const [stopDeskPrice, setStopDeskPrice] = React.useState("300");
   const [deliveryDays, setDeliveryDays] = React.useState("3");
   const [saving, setSaving] = React.useState(false);
+
+  type WilayaErr = "code" | "name" | "nameAr" | "price" | "stopPrice" | "days";
+  const [errors, setErrors] = React.useState<Partial<Record<WilayaErr, string>>>(
+    {},
+  );
+  const clearWErr = (k: WilayaErr) =>
+    setErrors((prev) => {
+      if (!prev[k]) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
 
   const reset = () => {
     setCode("");
@@ -523,35 +762,62 @@ function NewWilayaDialog({
     setNameAr("");
     setRegion("Nord");
     setShippingPrice("600");
+    setStopDeskPrice("300");
     setDeliveryDays("3");
+    setErrors({});
   };
 
   const submit = async () => {
     const trimmedCode = code.trim();
     const trimmedName = name.trim();
     const trimmedNameAr = nameAr.trim();
-    if (!/^[0-9]{1,2}$/.test(trimmedCode)) {
-      toast.error("Le code doit être 1 ou 2 chiffres (ex. 59).");
-      return;
+    const next: Partial<Record<WilayaErr, string>> = {};
+
+    // Code: 1–2 digits, value 1–99 (not "0" or "00").
+    if (!CODE_RE.test(trimmedCode) || parseInt(trimmedCode, 10) <= 0) {
+      next.code = "1 ou 2 chiffres entre 1 et 99 (ex. 59).";
     }
-    if (!trimmedName) {
-      toast.error("Renseignez le nom français.");
-      return;
+    // FR name: 2–100 chars, must contain at least one Latin letter.
+    if (!NAME_FR_RE.test(trimmedName)) {
+      next.name = "2 à 100 caractères, doit contenir au moins une lettre latine.";
     }
-    if (!trimmedNameAr) {
-      toast.error("Renseignez le nom arabe.");
-      return;
+    // AR name: 2–100 chars, must contain at least one Arabic letter.
+    if (!NAME_AR_RE.test(trimmedNameAr)) {
+      next.nameAr = "2 à 100 caractères, doit contenir au moins une lettre arabe.";
     }
+
     const price = parseInt(shippingPrice, 10);
+    if (!POS_INT_RE.test(shippingPrice.trim()) || price > 100000) {
+      next.price = "Entier ≥ 0 et ≤ 100 000.";
+    }
+    const stopPrice = parseInt(stopDeskPrice, 10);
+    if (!POS_INT_RE.test(stopDeskPrice.trim()) || stopPrice > 100000) {
+      next.stopPrice = "Entier ≥ 0 et ≤ 100 000.";
+    } else if (
+      POS_INT_RE.test(shippingPrice.trim()) &&
+      Number.isFinite(price) &&
+      stopPrice > price
+    ) {
+      // Stop-desk should never exceed home delivery — if it did, the
+      // merchant would charge clients more to come pick up the parcel.
+      next.stopPrice = "Le prix point relais doit être ≤ au prix domicile.";
+    }
     const days = parseInt(deliveryDays, 10);
-    if (!Number.isFinite(price) || price < 0) {
-      toast.error("Prix de livraison invalide.");
+    if (
+      !POS_INT_RE.test(deliveryDays.trim()) ||
+      !Number.isFinite(days) ||
+      days < 1 ||
+      days > 30
+    ) {
+      next.days = "Entier entre 1 et 30.";
+    }
+
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Corrigez les champs en rouge avant d'enregistrer.");
       return;
     }
-    if (!Number.isFinite(days) || days < 1 || days > 30) {
-      toast.error("Délai de livraison invalide.");
-      return;
-    }
+
     const padded = trimmedCode.padStart(2, "0");
     const payload: WilayaCreate = {
       code: padded,
@@ -559,6 +825,7 @@ function NewWilayaDialog({
       nameAr: trimmedNameAr,
       region,
       shippingPrice: price,
+      stopDeskPrice: stopPrice,
       deliveryDays: days,
     };
     setSaving(true);
@@ -603,18 +870,26 @@ function NewWilayaDialog({
           <div className="grid gap-3 sm:grid-cols-[6rem_1fr]">
             <div className="space-y-1.5">
               <Label htmlFor="nw-code" className="text-xs">
-                Code
+                Code <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="nw-code"
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => {
+                  setCode(e.target.value);
+                  clearWErr("code");
+                }}
                 placeholder="59"
                 maxLength={2}
                 inputMode="numeric"
-                className="font-mono"
+                aria-invalid={!!errors.code}
+                className={cn(
+                  "font-mono",
+                  errors.code && "border-red-500 ring-2 ring-red-500/20",
+                )}
                 disabled={saving}
               />
+              <InlineErr message={errors.code} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="nw-region" className="text-xs">
@@ -642,36 +917,53 @@ function NewWilayaDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="nw-name" className="text-xs">
-                Nom (FR)
+                Nom (FR) <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="nw-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  clearWErr("name");
+                }}
                 placeholder="In Salah"
+                aria-invalid={!!errors.name}
+                className={cn(
+                  errors.name && "border-red-500 ring-2 ring-red-500/20",
+                )}
                 disabled={saving}
               />
+              <InlineErr message={errors.name} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="nw-name-ar" className="text-xs" dir="rtl">
-                الاسم (AR)
+                <span dir="rtl">الاسم (AR)</span>
+                <span className="ms-1 text-red-600">*</span>
               </Label>
               <Input
                 id="nw-name-ar"
                 value={nameAr}
-                onChange={(e) => setNameAr(e.target.value)}
+                onChange={(e) => {
+                  setNameAr(e.target.value);
+                  clearWErr("nameAr");
+                }}
                 placeholder="عين صالح"
                 dir="rtl"
                 lang="ar"
+                aria-invalid={!!errors.nameAr}
+                className={cn(
+                  errors.nameAr && "border-red-500 ring-2 ring-red-500/20",
+                )}
                 disabled={saving}
               />
+              <InlineErr message={errors.nameAr} />
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="nw-price" className="text-xs">
-                Prix de livraison (DZD)
+                Prix domicile (DZD) <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="nw-price"
@@ -680,14 +972,50 @@ function NewWilayaDialog({
                 max={100000}
                 step={50}
                 value={shippingPrice}
-                onChange={(e) => setShippingPrice(e.target.value)}
-                className="font-mono"
+                onChange={(e) => {
+                  setShippingPrice(e.target.value);
+                  clearWErr("price");
+                  // Re-validating stop-desk on home change is overkill;
+                  // we'll re-check at submit. Just clear stale errors.
+                  clearWErr("stopPrice");
+                }}
+                aria-invalid={!!errors.price}
+                className={cn(
+                  "font-mono",
+                  errors.price && "border-red-500 ring-2 ring-red-500/20",
+                )}
                 disabled={saving}
               />
+              <InlineErr message={errors.price} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="nw-stop-price" className="text-xs">
+                Prix point relais (DZD){" "}
+                <span className="text-red-600">*</span>
+              </Label>
+              <Input
+                id="nw-stop-price"
+                type="number"
+                min={0}
+                max={100000}
+                step={50}
+                value={stopDeskPrice}
+                onChange={(e) => {
+                  setStopDeskPrice(e.target.value);
+                  clearWErr("stopPrice");
+                }}
+                aria-invalid={!!errors.stopPrice}
+                className={cn(
+                  "font-mono",
+                  errors.stopPrice && "border-red-500 ring-2 ring-red-500/20",
+                )}
+                disabled={saving}
+              />
+              <InlineErr message={errors.stopPrice} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="nw-days" className="text-xs">
-                Délai (jours)
+                Délai (jours) <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="nw-days"
@@ -696,10 +1024,18 @@ function NewWilayaDialog({
                 max={30}
                 step={1}
                 value={deliveryDays}
-                onChange={(e) => setDeliveryDays(e.target.value)}
-                className="font-mono"
+                onChange={(e) => {
+                  setDeliveryDays(e.target.value);
+                  clearWErr("days");
+                }}
+                aria-invalid={!!errors.days}
+                className={cn(
+                  "font-mono",
+                  errors.days && "border-red-500 ring-2 ring-red-500/20",
+                )}
                 disabled={saving}
               />
+              <InlineErr message={errors.days} />
             </div>
           </div>
 
@@ -746,10 +1082,23 @@ function CommunesDialog({ wilaya }: { wilaya: Wilaya }) {
   const [adding, setAdding] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<number | null>(null);
 
+  type CommuneErr = "code" | "name" | "nameAr";
+  const [errors, setErrors] = React.useState<Partial<Record<CommuneErr, string>>>(
+    {},
+  );
+  const clearCErr = (k: CommuneErr) =>
+    setErrors((prev) => {
+      if (!prev[k]) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
+
   const reset = () => {
     setCode("");
     setName("");
     setNameAr("");
+    setErrors({});
   };
 
   React.useEffect(() => {
@@ -778,18 +1127,26 @@ function CommunesDialog({ wilaya }: { wilaya: Wilaya }) {
     const c = code.trim();
     const n = name.trim();
     const nAr = nameAr.trim();
-    if (!c) {
-      toast.error("Code requis");
+    const next: Partial<Record<CommuneErr, string>> = {};
+
+    // Algerian postal codes are exactly 5 digits, but admin refs can
+    // vary — accept 4 to 6 digits to be permissive.
+    if (!POSTAL_RE.test(c)) {
+      next.code = "Code postal : 4 à 6 chiffres (ex. 19000).";
+    }
+    if (!NAME_FR_RE.test(n)) {
+      next.name = "2 à 100 caractères, doit contenir au moins une lettre latine.";
+    }
+    if (!NAME_AR_RE.test(nAr)) {
+      next.nameAr = "2 à 100 caractères, doit contenir au moins une lettre arabe.";
+    }
+
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Corrigez les champs en rouge avant d'ajouter.");
       return;
     }
-    if (!n) {
-      toast.error("Nom français requis");
-      return;
-    }
-    if (!nAr) {
-      toast.error("Nom arabe requis");
-      return;
-    }
+
     const payload: CommuneCreate = { code: c, name: n, nameAr: nAr };
     setAdding(true);
     try {
@@ -856,11 +1213,11 @@ function CommunesDialog({ wilaya }: { wilaya: Wilaya }) {
               {loading
                 ? "Chargement…"
                 : count === 0
-                  ? "Aucune commune pour cette wilaya. Ajoutez la première ci-dessous."
-                  : `${count} commune${count > 1 ? "s" : ""}`}
+                  ? "Aucune commune. Lancez « Synchroniser les territoires » dans les réglages ZR Express."
+                  : `${count} commune${count > 1 ? "s" : ""} — importées depuis ZR Express (lecture seule).`}
             </Small>
             {list && list.length > 0 ? (
-              <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto rounded-md border border-zinc-200 bg-white p-2">
+              <ul className="mt-3 max-h-[min(16rem,30dvh)] space-y-1 overflow-y-auto rounded-md border border-zinc-200 bg-white p-2">
                 {list.map((c) => (
                   <li
                     key={c.id}
@@ -875,82 +1232,10 @@ function CommunesDialog({ wilaya }: { wilaya: Wilaya }) {
                     >
                       {c.nameAr}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => void remove(c)}
-                      disabled={deletingId === c.id}
-                      aria-label={`Supprimer ${c.name}`}
-                      className={cn(
-                        "inline-flex size-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:bg-red-50 hover:text-red-600",
-                        "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                      )}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
                   </li>
                 ))}
               </ul>
             ) : null}
-          </div>
-
-          {/* Add form */}
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-            <h3 className="font-sans text-sm font-semibold text-zinc-900">
-              Ajouter une commune
-            </h3>
-            <div className="mt-3 grid gap-3 sm:grid-cols-[8rem_1fr_1fr]">
-              <div className="space-y-1.5">
-                <Label htmlFor="nc-code" className="text-xs">
-                  Code
-                </Label>
-                <Input
-                  id="nc-code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="19000"
-                  className="font-mono"
-                  disabled={adding}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="nc-name" className="text-xs">
-                  Nom (FR)
-                </Label>
-                <Input
-                  id="nc-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="El Eulma"
-                  disabled={adding}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="nc-name-ar" className="text-xs" dir="rtl">
-                  الاسم (AR)
-                </Label>
-                <Input
-                  id="nc-name-ar"
-                  value={nameAr}
-                  onChange={(e) => setNameAr(e.target.value)}
-                  placeholder="العلمة"
-                  dir="rtl"
-                  lang="ar"
-                  disabled={adding}
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={() => void add()}
-                disabled={adding}
-              >
-                <Plus className="size-3.5" />
-                {adding ? "Ajout…" : "Ajouter"}
-              </Button>
-            </div>
           </div>
         </div>
 

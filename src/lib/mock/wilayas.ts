@@ -1,5 +1,10 @@
 import type { Wilaya } from "@/lib/types";
 
+/** Stop-desk (point-relais) price derived from home delivery: 300 DZD
+ *  cheaper, floored at 200 DZD. Matches the Yalidine / Maystro pattern
+ *  and the backend seeder's default. */
+const stopDeskFromHome = (home: number): number => Math.max(200, home - 300);
+
 /**
  * All 58 wilayas of Algeria, codes 01-58, French + Arabic names.
  *
@@ -8,8 +13,12 @@ import type { Wilaya } from "@/lib/types";
  *  - Saharan wilayas (Tindouf, Tamanrasset, Illizi, etc.) are most expensive
  *    (900-1200 DZD / 4-5 days)
  *  - Northern/coastal regions sit between 500-700 DZD / 2-3 days.
+ *
+ * `stopDeskPrice` is derived from `shippingPrice` via stopDeskFromHome
+ * below (3-line .map after the array) so we don't have to maintain two
+ * columns per row.
  */
-export const wilayas: Wilaya[] = [
+const rawWilayas: Omit<Wilaya, "stopDeskPrice">[] = [
   { id: "01", code: "01", name: "Adrar", nameAr: "أدرار", region: "Sud", shippingPrice: 1100, deliveryDays: 5 },
   { id: "02", code: "02", name: "Chlef", nameAr: "الشلف", region: "Centre", shippingPrice: 600, deliveryDays: 3 },
   { id: "03", code: "03", name: "Laghouat", nameAr: "الأغواط", region: "Sud", shippingPrice: 800, deliveryDays: 4 },
@@ -69,6 +78,11 @@ export const wilayas: Wilaya[] = [
   { id: "57", code: "57", name: "El M'Ghair", nameAr: "المغير", region: "Sud", shippingPrice: 900, deliveryDays: 4 },
   { id: "58", code: "58", name: "El Meniaa", nameAr: "المنيعة", region: "Sud", shippingPrice: 950, deliveryDays: 4 },
 ];
+
+export const wilayas: Wilaya[] = rawWilayas.map((w) => ({
+  ...w,
+  stopDeskPrice: stopDeskFromHome(w.shippingPrice),
+}));
 
 export function getWilayaById(id: string): Wilaya | undefined {
   return wilayas.find((w) => w.id === id);

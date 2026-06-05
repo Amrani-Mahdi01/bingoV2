@@ -5,21 +5,29 @@ import * as React from "react";
 import {
   readLocalSettings,
   siteContact as defaults,
+  siteContactFromSettings,
   type SiteContact,
 } from "@/lib/site-contact";
 
 /**
  * Storefront-wide context that carries the admin-edited contact info
- * (phone, email, WhatsApp, address, social URLs). The (public) layout
- * fetches `/api/settings` server-side, parses it into a `SiteContact`,
- * and seeds this provider with that value as `initialValue`.
+ * (phone, email, WhatsApp, address, social URLs).
  *
- * On the client we also overlay localStorage on top of the server value,
- * so admin edits persist on the same device even while the backend
- * allow-list for `contact.*` / `social.*` is still being built out.
- * When the server starts returning those keys, they win on next mount.
+ * Three layers, in priority order (highest wins per field):
+ *   1. Live server fetch on mount — `GET /api/settings` runs once when
+ *      the provider mounts, bypassing the SSR `revalidate: 60` cache.
+ *      This is what makes admin edits show up immediately on refresh.
+ *   2. `initialValue` — server-side seed baked into the HTML at SSR.
+ *   3. localStorage cache — kept around so the admin's edits persist
+ *      per-device even if the network blip drops layers 1 + 2.
+ *
+ * In effect: the latest server data always wins; localStorage is just
+ * a safety net.
  */
 const SiteContactContext = React.createContext<SiteContact>(defaults);
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
 
 export function SiteContactProvider({
   initialValue,
@@ -30,44 +38,102 @@ export function SiteContactProvider({
 }) {
   const [value, setValue] = React.useState<SiteContact>(initialValue);
 
-  // Merge any locally-cached overrides on mount, and re-read whenever
-  // another tab updates the cache (admin form in a separate tab).
   React.useEffect(() => {
-    const apply = () => {
+    let cancelled = false;
+
+    /** Combine three sources into a single SiteContact.
+     *  Priority: serverMap[key] > localStorage[key] > initialValue[field]. */
+    const apply = (serverMap: Record<string, string | null> | null) => {
       const local = readLocalSettings();
-      if (Object.keys(local).length === 0) {
-        setValue(initialValue);
-        return;
-      }
-      // Local overrides per-field; everything else stays at initialValue.
-      const pick = (key: string, fb: string): string =>
-        typeof local[key] === "string" && local[key].length > 0
-          ? local[key]
-          : fb;
+      const pick = (key: string, fb: string): string => {
+        const fromServer = serverMap?.[key];
+        if (typeof fromServer === "string" && fromServer.length > 0) {
+          return fromServer;
+        }
+        const fromLocal = local[key];
+        if (typeof fromLocal === "string" && fromLocal.length > 0) {
+          return fromLocal;
+        }
+        return fb;
+      };
+      if (cancelled) return;
+      // If we got a fresh server map, project it through the canonical
+      // mapper first so the structure exactly matches what SSR built —
+      // then overlay local + defaults on any field the server omitted.
+      const fromServer = serverMap ? siteContactFromSettings(serverMap) : null;
       setValue({
-        phone: pick("contact.phone", initialValue.phone),
-        email: pick("contact.email", initialValue.email),
-        whatsapp: pick("contact.whatsapp", initialValue.whatsapp),
-        addressFr: pick("contact.address.fr", initialValue.addressFr),
-        addressAr: pick("contact.address.ar", initialValue.addressAr),
+        phone: pick("contact.phone", fromServer?.phone ?? initialValue.phone),
+        email: pick("contact.email", fromServer?.email ?? initialValue.email),
+        whatsapp: pick(
+          "contact.whatsapp",
+          fromServer?.whatsapp ?? initialValue.whatsapp,
+        ),
+        addressFr: pick(
+          "contact.address.fr",
+          fromServer?.addressFr ?? initialValue.addressFr,
+        ),
+        addressAr: pick(
+          "contact.address.ar",
+          fromServer?.addressAr ?? initialValue.addressAr,
+        ),
+        mapsUrl: pick(
+          "contact.maps_url",
+          fromServer?.mapsUrl ?? initialValue.mapsUrl,
+        ),
+        mapsPlaceFr: pick(
+          "contact.maps_place.fr",
+          fromServer?.mapsPlaceFr ?? initialValue.mapsPlaceFr,
+        ),
+        mapsPlaceAr: pick(
+          "contact.maps_place.ar",
+          fromServer?.mapsPlaceAr ?? initialValue.mapsPlaceAr,
+        ),
         social: {
-          facebook: pick("social.facebook", initialValue.social.facebook),
-          instagram: pick("social.instagram", initialValue.social.instagram),
-          tiktok: pick("social.tiktok", initialValue.social.tiktok),
-          youtube: pick("social.youtube", initialValue.social.youtube),
-          whatsappBusiness: pick(
-            "social.whatsapp_business",
-            initialValue.social.whatsappBusiness
+          facebook: pick(
+            "social.facebook",
+            fromServer?.social.facebook ?? initialValue.social.facebook,
+          ),
+          instagram: pick(
+            "social.instagram",
+            fromServer?.social.instagram ?? initialValue.social.instagram,
+          ),
+          tiktok: pick(
+            "social.tiktok",
+            fromServer?.social.tiktok ?? initialValue.social.tiktok,
+          ),
+          youtube: pick(
+            "social.youtube",
+            fromServer?.social.youtube ?? initialValue.social.youtube,
           ),
         },
       });
     };
-    apply();
+
+    // First paint: apply with no server map (uses localStorage + initialValue).
+    apply(null);
+
+    // Then fetch the live server map and re-apply so admin edits show up
+    // even when SSR is still serving a stale revalidate-60 cache.
+    if (API_URL) {
+      fetch(`${API_URL}/api/settings`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((body) => {
+          const data = body?.data;
+          if (data && typeof data === "object") apply(data);
+        })
+        .catch(() => {
+          /* swallow — initial paint is still fine */
+        });
+    }
+
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "bingo.siteContact.v1") apply();
+      if (e.key === "bingo.siteContact.v1") apply(null);
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+    };
   }, [initialValue]);
 
   return (

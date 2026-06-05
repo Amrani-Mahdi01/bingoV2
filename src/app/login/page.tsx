@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Check,
@@ -20,24 +20,41 @@ import { ApiError, AUTH_ENABLED } from "@/lib/api-client";
 import { useAdminAuth } from "@/lib/admin-auth";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
+import { useLocalize } from "@/components/ui/locale-link";
 import { cn } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Emails that should authenticate against the admin guard instead of
- *  the customer guard. Extend as more admin accounts come online. */
-const ADMIN_EMAILS = new Set(["admin@admin.com"]);
-function isAdminEmail(email: string): boolean {
-  return ADMIN_EMAILS.has(email.trim().toLowerCase());
-}
-
 type Errors = Partial<Record<"email" | "password" | "form", string>>;
 
+// `useSearchParams()` opts the page into client-side rendering at the
+// nearest Suspense boundary. Without one wrapping us, Next 16's static
+// prerender of /login bails — so the page default exports a Suspense
+// shell and the real form lives in <LoginPageInner>.
 export default function LoginPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <LoginPageInner />
+    </React.Suspense>
+  );
+}
+
+function LoginPageInner() {
   const { t, lang } = useLanguage();
   const { login } = useAuth();
   const { login: adminLogin } = useAdminAuth();
   const router = useRouter();
+  const localize = useLocalize();
+  // `?next=/somewhere` lets us bounce the customer back to a gated page
+  // they tried to open before logging in (e.g. /mes-commandes). Confine
+  // to same-origin relative paths so a forged link can't redirect to
+  // an external site after auth.
+  const searchParams = useSearchParams();
+  const nextParam = searchParams?.get("next") ?? null;
+  const safeNext =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : null;
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -58,7 +75,7 @@ export default function LoginPage() {
     if (!email.trim()) e.email = t("login.error.emailMissing");
     else if (!EMAIL_RE.test(email.trim())) e.email = t("login.error.emailInvalid");
     if (!password) e.password = t("login.error.passwordMissing");
-    else if (password.length < 6) e.password = t("login.error.passwordShort");
+    else if (password.length < 8) e.password = t("login.error.passwordShort");
     return e;
   };
 
@@ -84,12 +101,35 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const trimmed = email.trim();
-      if (isAdminEmail(trimmed)) {
-        await adminLogin(trimmed, password);
-        router.push("/admin");
-      } else {
+      // Try the customer guard first. It's the broader audience AND
+      // when a customer has been paired to an admin (promoted from
+      // /admin/customers), the customer-login response already carries
+      // an admin_token alongside — so dual-identity users only ever hit
+      // this branch. Only when the email genuinely has no customer row
+      // do we fall back to the admin-only login.
+      try {
         await login(trimmed, password);
-        router.push("/");
+        router.push(safeNext ?? localize("/"));
+      } catch (customerErr) {
+        // Customer side rejected — try the admin endpoint. Catches
+        // teammates added via /admin/customers/admins, who have an
+        // admin row but no matching customer.
+        if (
+          customerErr instanceof ApiError &&
+          (customerErr.status === 422 || customerErr.status === 401)
+        ) {
+          try {
+            await adminLogin(trimmed, password);
+            router.push(safeNext ?? "/admin");
+            return;
+          } catch {
+            // Admin login also failed — surface the original customer
+            // error so the UX message stays consistent regardless of
+            // which side actually failed.
+            throw customerErr;
+          }
+        }
+        throw customerErr;
       }
     } catch (err) {
       if (err instanceof ApiError) {

@@ -44,7 +44,12 @@ export function StockPill({ status, compact = false, className }: StockPillProps
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium uppercase tracking-wide",
         c.cls,
-        compact && "px-1.5",
+        // `compact` is used inside the products table + the mobile
+        // product card. On mobile we want the pill to match the
+        // smaller neighbouring badges (Actif/Inactif at text-[9px]),
+        // then revert to the standard size on md+ where the table
+        // chrome has room.
+        compact && "gap-0.5 px-1.5 py-0 text-[9px] md:gap-1.5 md:px-2 md:py-0.5 md:text-xs",
         className,
       )}
     >

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
 import { usePathname } from "next/navigation";
 import {
   ArrowRight,
@@ -26,17 +26,19 @@ import { cn } from "@/lib/utils";
 import {
   FacebookIcon,
   InstagramIcon,
+  TikTokIcon,
   WhatsappIcon,
 } from "@/components/icons/social";
+import { useAdminAuth } from "@/lib/admin-auth";
 import { useAuth } from "@/lib/auth";
 import {
   categoryHref,
   productHref,
-  searchCatalogue,
   subCategoryHref,
 } from "@/lib/catalogue";
-import { type Product } from "@/lib/products";
-import { useCart, type CartItem } from "@/lib/cart";
+import { categoriesApi, type ApiCategory } from "@/lib/api/categories";
+import { productsApi, type ApiProduct } from "@/lib/api/products";
+import { lineId, useCart, type CartItem } from "@/lib/cart";
 import { useFavorites } from "@/lib/favorites";
 import {
   useFormatPrice,
@@ -44,6 +46,9 @@ import {
   useProductName,
   type Language,
 } from "@/lib/i18n";
+import { useSiteBranding } from "@/lib/site-branding-context";
+import { useSiteContact } from "@/lib/site-contact-context";
+import { digitsOnly, telHref } from "@/lib/site-contact";
 
 /* Nav + strip items reference translation keys so they swap with the
    active language. The keys live in `src/lib/i18n.tsx`. */
@@ -56,9 +61,7 @@ const NAV_ITEMS = [
 
 const STRIP_KEYS = [
   "strip.coords",
-  "strip.shipping",
   "strip.guides",
-  "strip.returns",
   "strip.reviews",
 ] as const;
 
@@ -67,8 +70,22 @@ export function Header() {
   // Admin routes have their own chrome — don't render the customer
   // header on top of them.
   const isAdminRoute = pathname?.startsWith("/admin") ?? false;
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { count: favoritesCount } = useFavorites();
+  const siteContact = useSiteContact();
+  const branding = useSiteBranding();
+  // Header label priority:
+  //   1. "Nom du lieu" — short marketing label set in /admin/contacts
+  //      (contact.maps_place.{fr,ar}). This is what merchants edit when
+  //      they want to change what shows here.
+  //   2. Postal address (contact.address.{fr,ar}) — fallback for installs
+  //      that haven't filled in the place name yet.
+  //   3. i18n translation — last-ditch so the bar never shows blank.
+  const placeLabel =
+    lang === "ar" ? siteContact.mapsPlaceAr : siteContact.mapsPlaceFr;
+  const postalAddress =
+    lang === "ar" ? siteContact.addressAr : siteContact.addressFr;
+  const address = placeLabel || postalAddress || t("header.address");
   const [scrolled, setScrolled] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
@@ -120,55 +137,104 @@ export function Header() {
         <div className="mx-auto flex h-9 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Contact (start) */}
           <ul className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.16em] sm:gap-5 sm:text-[10.5px] sm:tracking-[0.18em]">
-            <li>
-              <a
-                href="tel:+213673812896"
-                dir="ltr"
-                className="inline-flex items-center gap-1.5 transition-colors hover:text-tangerine-300"
-              >
-                <Phone className="size-3" strokeWidth={2} />
-                +213 673 81 28 96
-              </a>
-            </li>
-            <li className="hidden md:block">
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="size-3" strokeWidth={2} />
-                {t("header.address")}
-              </span>
-            </li>
+            {siteContact.phone ? (
+              <li>
+                <a
+                  href={telHref(siteContact.phone)}
+                  dir="ltr"
+                  className="inline-flex items-center gap-1.5 transition-colors hover:text-tangerine-300"
+                >
+                  <Phone className="size-3" strokeWidth={2} />
+                  {siteContact.phone}
+                </a>
+              </li>
+            ) : null}
+            {address ? (
+              <li className="hidden md:block">
+                {siteContact.mapsUrl ? (
+                  <a
+                    href={siteContact.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${address} — Google Maps`}
+                    className="inline-flex items-center gap-1.5 transition-colors hover:text-tangerine-300"
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                  >
+                    <MapPin className="size-3" strokeWidth={2} />
+                    {address}
+                  </a>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5"
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                  >
+                    <MapPin className="size-3" strokeWidth={2} />
+                    {address}
+                  </span>
+                )}
+              </li>
+            ) : null}
           </ul>
 
-          {/* Socials (end) */}
+          {/* Socials (end) — only the channels the admin has actually
+              configured. Hidden when no URL is set so the bar doesn't
+              show dead links. */}
           <ul className="flex items-center gap-1">
+            {/* Map pin — mobile only. On md+ the address chip on the
+                left already links to Maps, so showing it here too would
+                be redundant; below md that chip is hidden, so surface
+                the location next to the social icons instead. */}
+            {siteContact.mapsUrl ? (
+              <li className="md:hidden">
+                <a
+                  href={siteContact.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={address ? `${address} — Google Maps` : "Google Maps"}
+                  className="grid size-7 place-items-center rounded-full text-cream/70 transition-colors hover:bg-forest-700 hover:text-tangerine-300"
+                >
+                  <MapPin className="size-3.5" strokeWidth={2} />
+                </a>
+              </li>
+            ) : null}
             {[
               {
                 label: "Instagram",
                 Icon: InstagramIcon,
-                href: "https://www.instagram.com/bingo_camping19/",
+                href: siteContact.social.instagram,
               },
               {
                 label: "Facebook",
                 Icon: FacebookIcon,
-                href: "https://www.facebook.com/profile.php?id=100090231580510",
+                href: siteContact.social.facebook,
+              },
+              {
+                label: "TikTok",
+                Icon: TikTokIcon,
+                href: siteContact.social.tiktok,
               },
               {
                 label: "WhatsApp",
                 Icon: WhatsappIcon,
-                href: "https://wa.me/213673812896",
+                href: siteContact.whatsapp
+                  ? `https://wa.me/${digitsOnly(siteContact.whatsapp)}`
+                  : "",
               },
-            ].map(({ label, Icon, href }) => (
-              <li key={label}>
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="grid size-7 place-items-center rounded-full text-cream/70 transition-colors hover:bg-forest-700 hover:text-tangerine-300"
-                >
-                  <Icon className="size-3.5" />
-                </a>
-              </li>
-            ))}
+            ]
+              .filter((s) => s.href && s.href.length > 0)
+              .map(({ label, Icon, href }) => (
+                <li key={label}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="grid size-7 place-items-center rounded-full text-cream/70 transition-colors hover:bg-forest-700 hover:text-tangerine-300"
+                  >
+                    <Icon className="size-3.5" />
+                  </a>
+                </li>
+              ))}
           </ul>
         </div>
       </div>
@@ -188,26 +254,48 @@ export function Header() {
         />
 
         <div className="group/bar mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:h-[72px] sm:gap-4 sm:px-6 lg:gap-6 lg:px-8">
-          {/* Logo (left) */}
+          {/* Logo (left) — admin-uploaded image when available, falls
+              back to the hardcoded Mountain + "BINGO" wordmark. */}
           <Link
             href="/"
             aria-label={t("brand.home")}
             className="group relative flex shrink-0 items-center gap-2"
           >
-            <span
-              aria-hidden
-              className="flex size-7 items-center justify-center rounded-md bg-forest-900 text-cream transition-transform duration-500 group-hover:rotate-[-8deg]"
-            >
-              <Mountain className="size-4" strokeWidth={2.2} />
-            </span>
-            <span className="flex items-baseline font-display text-[22px] font-bold leading-none tracking-[-0.04em] text-forest-900 sm:text-[26px]">
-              BINGO
-              <span
-                aria-hidden
-                className="bingo-dot ms-0.5 size-1.5 rounded-full bg-tangerine-500 sm:size-[7px]"
-                style={{ animation: "bingo-dot-pulse 3.2s ease-in-out infinite" }}
+            {branding.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={branding.logoUrl}
+                alt={lang === "ar" ? branding.logoAltAr : branding.logoAltFr}
+                style={{
+                  height: `${branding.logoHeight}px`,
+                  maxWidth: `${branding.logoMaxWidth}px`,
+                  borderRadius:
+                    branding.logoRadius >= 9999
+                      ? "9999px"
+                      : `${branding.logoRadius}px`,
+                }}
+                className="w-auto object-contain transition-transform duration-500 group-hover:rotate-[-4deg]"
               />
-            </span>
+            ) : (
+              <>
+                <span
+                  aria-hidden
+                  className="flex size-7 items-center justify-center rounded-md bg-forest-900 text-cream transition-transform duration-500 group-hover:rotate-[-8deg]"
+                >
+                  <Mountain className="size-4" strokeWidth={2.2} />
+                </span>
+                <span className="flex items-baseline font-display text-[22px] font-bold leading-none tracking-[-0.04em] text-forest-900 sm:text-[26px]">
+                  BINGO
+                  <span
+                    aria-hidden
+                    className="bingo-dot ms-0.5 size-1.5 rounded-full bg-tangerine-500 sm:size-[7px]"
+                    style={{
+                      animation: "bingo-dot-pulse 3.2s ease-in-out infinite",
+                    }}
+                  />
+                </span>
+              </>
+            )}
           </Link>
 
           {/* Nav — lg+ only, centered. Aggressively compact at lg (no
@@ -407,9 +495,17 @@ function HeaderSearch({
   autoFocus?: boolean;
   onSelect?: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const isAr = lang === "ar";
   const formatPrice = useFormatPrice();
   const productName = useProductName();
+  // Translate a category or product name to the active UI language, with
+  // a graceful fallback when the AR field is empty.
+  const catName = React.useCallback(
+    (c: { nameFr: string; nameAr: string }) =>
+      isAr && c.nameAr ? c.nameAr : c.nameFr,
+    [isAr],
+  );
   const [query, setQuery] = React.useState("");
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -422,15 +518,93 @@ function HeaderSearch({
   }, [autoFocus]);
 
   const trimmedQuery = query.trim();
-  const results = React.useMemo(
-    () => searchCatalogue(trimmedQuery),
-    [trimmedQuery]
-  );
-  const hasResults =
+
+  /* ─── Live results from the backend ─────────────────────────────
+     - Categories: fetched once on first focus, then filtered
+       client-side by name (the public /api/categories endpoint has
+       no `q` param and the corpus is small).
+     - Sub-categories: same fetch, flattened from the category tree.
+     - Products: debounced 250 ms POST-keystroke call to
+       /api/products?q=… so we don't spam the server while typing.
+       In-flight requests are aborted when the query changes. */
+  const [allCategories, setAllCategories] = React.useState<ApiCategory[] | null>(null);
+  const [products, setProducts] = React.useState<ApiProduct[]>([]);
+  const [searching, setSearching] = React.useState(false);
+  const lastQueryRef = React.useRef("");
+
+  // Lazy-load the category tree the first time the dropdown opens.
+  React.useEffect(() => {
+    if (!open || allCategories !== null) return;
+    const ctrl = new AbortController();
+    categoriesApi
+      .listPublic({ signal: ctrl.signal })
+      .then((cats) => setAllCategories(cats))
+      .catch(() => {
+        /* swallow — search just shows products if categories fail */
+      });
+    return () => ctrl.abort();
+  }, [open, allCategories]);
+
+  // Debounced product search. Min 2 chars to avoid pinging the backend
+  // on every keystroke; cancels the previous fetch when the query
+  // changes mid-flight.
+  React.useEffect(() => {
+    if (trimmedQuery.length < 2) {
+      setProducts([]);
+      setSearching(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    setSearching(true);
+    const t = setTimeout(() => {
+      lastQueryRef.current = trimmedQuery;
+      productsApi
+        .searchPublic({ q: trimmedQuery, perPage: 8, signal: ctrl.signal })
+        .then((res) => {
+          // Ignore stale responses (a faster fetch resolved last).
+          if (lastQueryRef.current !== trimmedQuery) return;
+          setProducts(res.data);
+          setSearching(false);
+        })
+        .catch((err) => {
+          if (err instanceof Error && err.name === "AbortError") return;
+          setProducts([]);
+          setSearching(false);
+        });
+    }, 250);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [trimmedQuery]);
+
+  // Local fuzzy match for categories + sub-categories. Works for both
+  // Latin (case-insensitive) and Arabic (script-preserving) queries —
+  // both name fields are checked regardless of the typed script so a
+  // French user can still find "خيمة" and vice-versa.
+  const results = React.useMemo(() => {
+    const qLower = trimmedQuery.toLowerCase();
+    const qRaw = trimmedQuery; // Arabic queries — toLowerCase is a no-op
+    const cats = allCategories ?? [];
+    const tops = cats.filter((c) => !c.parentId);
+    const subs = cats.flatMap((c) => c.children ?? []);
+    const matchCat = (c: ApiCategory) =>
+      !trimmedQuery ||
+      c.nameFr.toLowerCase().includes(qLower) ||
+      c.nameAr.includes(qRaw) ||
+      c.slug.toLowerCase().includes(qLower);
+    return {
+      categories: trimmedQuery ? tops.filter(matchCat) : [],
+      subCategories: trimmedQuery ? subs.filter(matchCat) : [],
+      products,
+    };
+  }, [allCategories, products, trimmedQuery]);
+
+  const totalResults =
     results.categories.length +
-      results.subCategories.length +
-      results.products.length >
-    0;
+    results.subCategories.length +
+    results.products.length;
+  const hasResults = totalResults > 0;
 
   // Dropdown only appears when the user has actually typed something.
   // Focusing the empty input no longer pops it open.
@@ -487,12 +661,26 @@ function HeaderSearch({
           aria-label={t("search.aria")}
           aria-expanded={panelOpen}
           aria-controls="header-search-results"
+          // Arabic input: drop the uppercase + wide tracking that are
+          // designed for the Latin chrome — both render badly on Arabic
+          // (no case, broken ligatures), and switch to the display
+          // family + slightly larger size so the script reads cleanly.
+          dir={isAr ? "rtl" : "ltr"}
           className={cn(
-            "w-full rounded-full border border-wood-300/70 bg-cream ps-9 pe-3 font-mono uppercase tracking-[0.16em] text-wood-800 placeholder:text-wood-500/80",
+            "w-full rounded-full border border-wood-300/70 bg-cream ps-9 pe-3 text-wood-800 placeholder:text-wood-500/80",
             "transition-[background-color,border-color,box-shadow] duration-300 ease-out",
             "hover:border-wood-400",
             "focus:border-tangerine-500 focus:outline-none focus:ring-4 focus:ring-tangerine-500/15",
-            inline ? "h-9 text-[11px]" : "h-10 text-[12px]"
+            isAr
+              ? "font-display tracking-normal"
+              : "font-mono uppercase tracking-[0.16em]",
+            inline ? "h-9" : "h-10",
+            // Font-size: keep the compact sizing on the desktop inline
+            // search (lg+, mouse — no zoom issue there), but the mobile
+            // overlay input MUST be ≥16px or iOS Safari zooms the whole
+            // page in on focus and never zooms back out (Android is fine,
+            // which is why it doesn't repro on it).
+            inline ? (isAr ? "text-[14px]" : "text-[11px]") : "text-[16px]",
           )}
         />
         <kbd
@@ -516,14 +704,11 @@ function HeaderSearch({
           {/* Sticky query summary */}
           <div className="flex items-center justify-between gap-2 border-b border-wood-300/40 bg-cream-deep/40 px-3 py-2">
             <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-wood-600">
-              {hasResults
-                ? t("search.results.count", {
-                    n:
-                      results.categories.length +
-                      results.subCategories.length +
-                      results.products.length,
-                  })
-                : t("search.results.none")}
+              {searching
+                ? t("search.results.searching") || "Recherche…"
+                : hasResults
+                  ? t("search.results.count", { n: totalResults })
+                  : t("search.results.none")}
             </span>
             <span className="truncate font-mono text-[9.5px] text-tangerine-700">
               « {trimmedQuery} »
@@ -531,7 +716,7 @@ function HeaderSearch({
           </div>
 
           <div className="bingo-scrollbar max-h-[60vh] overflow-y-auto p-1.5">
-            {!hasResults ? (
+            {!hasResults && !searching ? (
               <div className="px-3 py-6 text-center">
                 <p className="font-display text-[13px] font-semibold text-forest-900">
                   {t("search.notFound.title")}
@@ -552,8 +737,8 @@ function HeaderSearch({
                       key={c.slug}
                       href={categoryHref(c.slug)}
                       onClick={close}
-                      image={c.image}
-                      title={c.name}
+                      image={c.image ?? ""}
+                      title={catName(c)}
                       meta={`${c.productCount} ${t("search.products").toLowerCase()}`}
                     />
                   ))}
@@ -564,14 +749,25 @@ function HeaderSearch({
                   count={results.subCategories.length}
                   layout="chips"
                 >
-                  {results.subCategories.slice(0, 8).map((s) => (
-                    <SearchChip
-                      key={`${s.parentSlug}/${s.slug}`}
-                      href={subCategoryHref(s)}
-                      onClick={close}
-                      label={s.name}
-                    />
-                  ))}
+                  {results.subCategories.slice(0, 8).map((s) => {
+                    const parent = allCategories?.find((c) => c.id === s.parentId);
+                    return (
+                      <SearchChip
+                        key={`${parent?.slug ?? "?"}/${s.slug}`}
+                        href={
+                          parent
+                            ? subCategoryHref({
+                                slug: s.slug,
+                                name: s.nameFr,
+                                parentSlug: parent.slug,
+                              })
+                            : categoryHref(s.slug)
+                        }
+                        onClick={close}
+                        label={catName(s)}
+                      />
+                    );
+                  })}
                 </SearchGroup>
 
                 <SearchGroup
@@ -579,16 +775,25 @@ function HeaderSearch({
                   count={results.products.length}
                   layout="list"
                 >
-                  {results.products.slice(0, 6).map((p) => (
-                    <SearchRow
-                      key={p.slug}
-                      href={productHref(p.slug)}
-                      onClick={close}
-                      image={p.image}
-                      title={productName(p)}
-                      meta={`${p.brand} · ${formatPrice(p.price)}`}
-                    />
-                  ))}
+                  {results.products.slice(0, 6).map((p) => {
+                    const firstImage = p.images?.[0]?.url ?? "";
+                    const brandName = p.brand?.name ?? "";
+                    const adapted = {
+                      slug: p.slug,
+                      name: p.nameFr,
+                      nameAr: p.nameAr,
+                    };
+                    return (
+                      <SearchRow
+                        key={p.slug}
+                        href={productHref(p.slug)}
+                        onClick={close}
+                        image={firstImage}
+                        title={productName(adapted)}
+                        meta={`${brandName}${brandName ? " · " : ""}${formatPrice(p.price)}`}
+                      />
+                    );
+                  })}
                 </SearchGroup>
               </>
             )}
@@ -701,8 +906,28 @@ function MobileMenu({
   open: boolean;
   onClose: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { customer, logout } = useAuth();
+  const { admin, logout: adminLogout } = useAdminAuth();
+  const siteContact = useSiteContact();
+  // Either guard counts as "signed in" for the mobile menu card.
+  // Customer wins when both happen to be present.
+  const sessionIsAdmin = !customer && !!admin;
+  const session = customer
+    ? {
+        kind: "customer" as const,
+        initial: (customer.firstName?.[0] ?? customer.email?.[0] ?? "?").toUpperCase(),
+        greeting: t("account.greeting", { name: customer.firstName }),
+        email: customer.email,
+      }
+    : admin
+      ? {
+          kind: "admin" as const,
+          initial: (admin.name?.[0] ?? admin.email?.[0] ?? "?").toUpperCase(),
+          greeting: t("account.greeting", { name: admin.name?.split(" ")[0] ?? admin.email }),
+          email: admin.email,
+        }
+      : null;
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
@@ -822,33 +1047,122 @@ function MobileMenu({
             ))}
           </ul>
 
+          {/* Boutique location — pulled from /api/settings (admin
+              edits in /admin/contacts). Place label wins over the
+              raw address if both are set (matches the dedupe rule we
+              use on the contact page). Tapping opens Google Maps in
+              a new tab; falls back to /contact when no maps URL is
+              configured. */}
+          {(() => {
+            const placeLabel =
+              (lang === "ar" ? siteContact.mapsPlaceAr : siteContact.mapsPlaceFr) || "";
+            const addressLine =
+              (lang === "ar" ? siteContact.addressAr : siteContact.addressFr) || "";
+            const primary = placeLabel || addressLine;
+            if (!primary) return null;
+            const mapsHref = siteContact.mapsUrl;
+            const ShopRow = (
+              <span className="flex items-start gap-3 rounded-xl bg-cream-deep/40 px-3 py-3 transition-colors hover:bg-cream-deep/60">
+                <MapPin
+                  className="mt-0.5 size-[18px] shrink-0 text-tangerine-700"
+                  strokeWidth={1.8}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-[13px] font-semibold leading-snug text-forest-900">
+                    {primary}
+                  </span>
+                  {placeLabel && addressLine && addressLine !== placeLabel ? (
+                    <span className="mt-0.5 block text-[11px] leading-snug text-wood-600">
+                      {addressLine}
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+            );
+            return (
+              <div className="mt-5 border-t border-wood-300/40 pt-4">
+                <p className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.24em] text-tangerine-700">
+                  {t("contact.card.shop.label")}
+                </p>
+                {mapsHref ? (
+                  <a
+                    href={mapsHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={onClose}
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                  >
+                    {ShopRow}
+                  </a>
+                ) : (
+                  <Link
+                    href="/contact"
+                    onClick={onClose}
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                  >
+                    {ShopRow}
+                  </Link>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="mt-5 border-t border-wood-300/40 pt-4">
             <p className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.24em] text-tangerine-700">
               {t("menu.mySpace")}
             </p>
-            {customer ? (
+            {session ? (
               <div className="mb-2 flex items-center gap-3 rounded-xl bg-cream-deep/40 px-3 py-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-900 text-cream font-display text-sm font-bold">
-                  {(customer.firstName?.[0] ?? customer.email?.[0] ?? "?").toUpperCase()}
+                <span
+                  className={cn(
+                    "grid size-9 shrink-0 place-items-center rounded-full text-cream font-display text-sm font-bold",
+                    session.kind === "admin"
+                      ? "bg-tangerine-600"
+                      : "bg-forest-900",
+                  )}
+                >
+                  {session.initial}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-display text-[13px] font-semibold text-forest-900">
-                    {t("account.greeting", { name: customer.firstName })}
+                    {session.greeting}
                   </p>
                   <p className="truncate font-mono text-[10px] text-wood-600">
-                    {customer.email}
+                    {session.email}
                   </p>
                 </div>
+                {session.kind === "admin" || admin ? (
+                  <span className="rounded-full bg-tangerine-500/15 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-tangerine-700">
+                    Admin
+                  </span>
+                ) : null}
               </div>
             ) : null}
             <ul className="flex flex-col gap-1">
-              {customer ? (
+              {session?.kind === "admin" || admin ? (
+                <li>
+                  <Link
+                    href="/admin"
+                    onClick={onClose}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-display text-[14px] text-wood-800 transition-colors hover:bg-cream-deep/70 hover:text-forest-900"
+                  >
+                    <Package className="size-[18px]" strokeWidth={1.8} />
+                    {t("account.adminSpace")}
+                  </Link>
+                </li>
+              ) : null}
+              {session ? (
                 <li>
                   <button
                     type="button"
                     onClick={() => {
                       onClose();
-                      void logout();
+                      // Tear down BOTH guards so a single Déconnexion
+                      // tap signs the user out fully — leaving admin
+                      // alive after a customer logout would make the
+                      // avatar reappear unexpectedly.
+                      if (customer) void logout();
+                      if (admin) void adminLogout();
                     }}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start font-display text-[14px] text-tangerine-700 transition-colors hover:bg-cream-deep/70"
                   >
@@ -868,6 +1182,21 @@ function MobileMenu({
                   </Link>
                 </li>
               )}
+              {/* "Mes commandes" — customer-only. Hidden when the only
+                  active session is admin (the admin storefront persona
+                  doesn't have its own order history). */}
+              {customer ? (
+                <li>
+                  <Link
+                    href="/mes-commandes"
+                    onClick={onClose}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-display text-[14px] text-wood-800 transition-colors hover:bg-cream-deep/70 hover:text-forest-900"
+                  >
+                    <Package className="size-[18px]" strokeWidth={1.8} />
+                    {t("account.orders")}
+                  </Link>
+                </li>
+              ) : null}
               <li>
                 <Link
                   href="/favoris"
@@ -1064,15 +1393,23 @@ function HeaderCart() {
           </div>
         ) : (
           <ul className="flex-1 overflow-y-auto divide-y divide-wood-300/40">
-            {items.map((item) => (
-              <CartLine
-                key={item.product.slug}
-                item={item}
-                onIncrement={() => updateQty(item.product.slug, 1)}
-                onDecrement={() => updateQty(item.product.slug, -1)}
-                onRemove={() => removeItem(item.product.slug)}
-              />
-            ))}
+            {items.map((item) => {
+              // Use the shared `lineId` helper so the key we send to
+              // updateQty / removeItem matches exactly what the cart
+              // provider stores. The previous "${slug}::${variantId ?? ''}"
+              // pattern produced "slug::" for items without a variant,
+              // which never matched the provider's "slug"-only key.
+              const key = lineId(item.product.slug, item.variant?.id);
+              return (
+                <CartLine
+                  key={key}
+                  item={item}
+                  onIncrement={() => updateQty(key, 1)}
+                  onDecrement={() => updateQty(key, -1)}
+                  onRemove={() => removeItem(key)}
+                />
+              );
+            })}
           </ul>
         )}
 
@@ -1159,12 +1496,18 @@ function CartLine({
   onDecrement: () => void;
   onRemove: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const formatPrice = useFormatPrice();
   const productName = useProductName();
-  const { product, qty } = item;
-  const lineTotal = product.price * qty;
+  const { product, qty, variant } = item;
+  const unit = product.price + (variant?.priceDelta ?? 0);
+  const lineTotal = unit * qty;
   const displayName = productName(product);
+  const colorLabel = variant
+    ? lang === "ar" && variant.colorNameAr
+      ? variant.colorNameAr
+      : variant.colorNameFr
+    : null;
 
   return (
     <li className="flex gap-3 px-3 py-3">
@@ -1193,10 +1536,29 @@ function CartLine({
           {displayName}
         </Link>
         <span className="truncate font-mono text-[10px] uppercase tracking-[0.16em] text-wood-600">
-          {product.categorySlug
-            ? t(`category.${product.categorySlug}`)
-            : product.brand}
+          {product.brand}
         </span>
+
+        {/* Variant chips — color swatch + name, size pill */}
+        {variant ? (
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {colorLabel ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-cream-deep px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-wood-700">
+                <span
+                  aria-hidden
+                  className="size-2 rounded-full border border-wood-300/60"
+                  style={{ backgroundColor: variant.colorHex ?? "#e5e5e5" }}
+                />
+                {colorLabel}
+              </span>
+            ) : null}
+            {variant.sizeLabel ? (
+              <span className="inline-flex items-center rounded-md border border-wood-300/70 bg-cream px-1.5 py-0.5 font-display text-[10px] font-semibold tracking-tight text-forest-900">
+                {variant.sizeLabel}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Qty stepper */}
         <div className="mt-2 inline-flex items-center self-start rounded-full border border-wood-300/70 bg-cream">
@@ -1245,10 +1607,15 @@ function CartLine({
 
 /* ─── Account button — User icon when logged out, initial-circle +
        dropdown when logged in. Desktop only (lg+); the mobile menu has
-       its own equivalent (see MobileMenu). ─────────────────────────── */
+       its own equivalent (see MobileMenu).
+       Recognizes both the customer and admin sessions so an admin
+       browsing the storefront also sees their "logged in" badge (with
+       a different avatar color + an "Espace admin" link in the menu).
+       Customer wins when somehow both are present. ─────────────────── */
 function AccountButton() {
   const { t } = useLanguage();
   const { customer, logout } = useAuth();
+  const { admin, logout: adminLogout } = useAdminAuth();
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -1268,7 +1635,7 @@ function AccountButton() {
     };
   }, [open]);
 
-  if (!customer) {
+  if (!customer && !admin) {
     return (
       <Link
         href="/login"
@@ -1286,8 +1653,21 @@ function AccountButton() {
     );
   }
 
-  const initial = (customer.firstName?.[0] ?? customer.email?.[0] ?? "?").toUpperCase();
-  const fullName = `${customer.firstName} ${customer.lastName}`.trim();
+  // Pick whichever identity is active. Customer ranks first because in
+  // the rare case both are signed-in on the same device, the storefront
+  // is "customer's house" and we should greet them as a shopper.
+  const isAdmin = !customer && !!admin;
+  const initial = isAdmin
+    ? (admin!.name?.[0] ?? admin!.email?.[0] ?? "?").toUpperCase()
+    : (customer!.firstName?.[0] ?? customer!.email?.[0] ?? "?").toUpperCase();
+  const fullName = isAdmin
+    ? admin!.name
+    : `${customer!.firstName} ${customer!.lastName}`.trim();
+  const firstName = isAdmin
+    ? (admin!.name?.split(" ")[0] ?? admin!.email)
+    : customer!.firstName?.trim() || customer!.email;
+  const email = isAdmin ? admin!.email : customer!.email;
+  const greetingName = firstName;
 
   return (
     <div ref={ref} className="relative hidden lg:block">
@@ -1296,11 +1676,18 @@ function AccountButton() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={t("account.menu.aria")}
+        aria-label={fullName || t("account.menu.aria")}
+        title={fullName}
         className={cn(
-          "grid size-10 place-items-center rounded-full bg-forest-900 text-cream",
+          // Just the avatar circle — no name, no pill. The role colour
+          // (admin vs customer) is the only visual cue that we're
+          // signed in; the dropdown carries the full identity.
+          "grid size-10 place-items-center rounded-full text-cream",
           "font-display text-sm font-bold tracking-tight",
-          "transition-all duration-200 hover:bg-forest-700",
+          "transition-all duration-200",
+          isAdmin
+            ? "bg-tangerine-600 hover:bg-tangerine-700"
+            : "bg-forest-900 hover:bg-forest-700",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
         )}
       >
@@ -1314,41 +1701,88 @@ function AccountButton() {
           {/* Greeting block */}
           <div className="border-b border-wood-300/40 bg-cream-deep/30 px-4 py-3">
             <p className="font-display text-[13px] font-semibold text-forest-900">
-              {t("account.greeting", { name: customer.firstName })}
+              {isAdmin
+                ? t("account.greeting", { name: greetingName })
+                : t("account.greeting", { name: customer!.firstName })}
             </p>
             <p className="mt-0.5 truncate font-mono text-[10.5px] text-wood-600">
-              {customer.email}
+              {email}
             </p>
+            {isAdmin || admin ? (
+              <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-tangerine-500/15 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-tangerine-700">
+                Admin
+              </span>
+            ) : null}
           </div>
 
           <ul className="py-1.5">
-            <li>
-              <Link
-                href="/favoris"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-3 py-2 font-display text-[13px] text-forest-900 transition-colors hover:bg-cream-deep/60"
-              >
-                <Heart className="size-4" strokeWidth={1.8} />
-                {t("icon.wishlist")}
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/commander"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-3 py-2 font-display text-[13px] text-forest-900 transition-colors hover:bg-cream-deep/60"
-              >
-                <Package className="size-4" strokeWidth={1.8} />
-                {t("account.orders")}
-              </Link>
-            </li>
+            {isAdmin ? (
+              <li>
+                <Link
+                  href="/admin"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2 font-display text-[13px] text-forest-900 transition-colors hover:bg-cream-deep/60"
+                >
+                  <Package className="size-4" strokeWidth={1.8} />
+                  {t("account.adminSpace")}
+                </Link>
+              </li>
+            ) : (
+              <>
+                {/* Dual identity (customer who is ALSO an admin) gets
+                    an extra "Espace admin" entry at the top so they
+                    can hop to /admin without logging out. */}
+                {admin ? (
+                  <>
+                    <li>
+                      <Link
+                        href="/admin"
+                        onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2 font-display text-[13px] text-tangerine-700 transition-colors hover:bg-cream-deep/60"
+                      >
+                        <Package className="size-4" strokeWidth={1.8} />
+                        {t("account.adminSpace")}
+                      </Link>
+                    </li>
+                    <li className="my-1 border-t border-wood-300/40" />
+                  </>
+                ) : null}
+                <li>
+                  <Link
+                    href="/favoris"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2 font-display text-[13px] text-forest-900 transition-colors hover:bg-cream-deep/60"
+                  >
+                    <Heart className="size-4" strokeWidth={1.8} />
+                    {t("icon.wishlist")}
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/mes-commandes"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2 font-display text-[13px] text-forest-900 transition-colors hover:bg-cream-deep/60"
+                  >
+                    <Package className="size-4" strokeWidth={1.8} />
+                    {t("account.orders")}
+                  </Link>
+                </li>
+              </>
+            )}
             <li className="my-1 border-t border-wood-300/40" />
             <li>
               <button
                 type="button"
                 onClick={() => {
                   setOpen(false);
-                  void logout();
+                  // Tear down BOTH guards when both are signed in. A
+                  // single Déconnexion click must read as "fully sign
+                  // me out" — otherwise dual-identity users (customer
+                  // promoted to admin) would only lose their customer
+                  // session and silently stay logged in as admin,
+                  // making the avatar "come back" after one click.
+                  if (customer) void logout();
+                  if (admin) void adminLogout();
                 }}
                 className="flex w-full items-center gap-3 px-3 py-2 text-start font-display text-[13px] text-tangerine-700 transition-colors hover:bg-cream-deep/60"
               >

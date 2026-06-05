@@ -85,6 +85,12 @@ export function LinkPicker({
   const [open, setOpen] = React.useState(false);
   const [data, setData] = React.useState<CorpusBundle | null>(null);
   const [query, setQuery] = React.useState("");
+  // Stops the page from auto-scrolling to the top when the popover
+  // opens — cmdk's CommandInput auto-focuses on mount, which makes
+  // the browser scroll the focused input into view and yanks the page.
+  // Capture the scroll position at the moment we open, then restore
+  // it for a few frames to overpower the focus side-effects.
+  const captureScroll = useFreezeScrollOnOpen(open);
 
   // Lazy-load the corpus the first time the popover opens. The admin
   // banner editor lives behind admin auth, so we can call admin endpoints.
@@ -172,7 +178,13 @@ export function LinkPicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) captureScroll();
+        setOpen(next);
+      }}
+    >
       <PopoverTrigger
         className={cn(
           "flex h-11 w-full items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-left text-sm transition-colors hover:border-zinc-400 data-placeholder:text-zinc-500",
@@ -184,7 +196,13 @@ export function LinkPicker({
         <ChevronsUpDown className="size-4 shrink-0 text-zinc-500" />
       </PopoverTrigger>
       <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] min-w-[360px] p-0"
+        className={cn(
+          // Mobile: hug the trigger width and never exceed the viewport
+          // (with a 12 px gutter on each side). Desktop (sm+): keep the
+          // original 360 px floor so longer product names breathe.
+          "w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1.5rem)] p-0",
+          "sm:min-w-[360px] sm:max-w-none",
+        )}
         align="start"
         initialFocus={false}
       >
@@ -194,7 +212,10 @@ export function LinkPicker({
             onValueChange={setQuery}
             placeholder="Rechercher catégorie, produit, filtre…"
           />
-          <CommandList className="max-h-80">
+          {/* `max-h-[min(20rem,55dvh)]` keeps the list tall on desktop
+              but shrinks to fit when the mobile keyboard pops up and
+              leaves less than 320 px of usable viewport. */}
+          <CommandList className="max-h-[min(20rem,55dvh)]">
             {data === null ? (
               <div className="px-4 py-6 text-center text-xs text-zinc-500">
                 Chargement…
@@ -331,4 +352,34 @@ export function LinkPicker({
       </PopoverContent>
     </Popover>
   );
+}
+
+/**
+ * Captures the current scroll position when called, then on the next
+ * `open === true` transition holds the window pinned to it for a few
+ * frames. Counteracts the browser's auto-scroll-on-focus behaviour
+ * that fires when cmdk's CommandInput mounts inside the popover.
+ *
+ * (Same hook lives inline in ProductCreateForm — kept duplicated here
+ * to avoid a cross-cutting refactor.)
+ */
+function useFreezeScrollOnOpen(open: boolean): () => void {
+  const yRef = React.useRef(0);
+  const captureScroll = React.useCallback(() => {
+    yRef.current = window.scrollY;
+  }, []);
+  React.useEffect(() => {
+    const y = yRef.current;
+    if (!open) {
+      window.scrollTo({ top: y, behavior: "instant" });
+      return;
+    }
+    let frames = 6;
+    const tick = () => {
+      window.scrollTo({ top: y, behavior: "instant" });
+      if (--frames > 0) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [open]);
+  return captureScroll;
 }

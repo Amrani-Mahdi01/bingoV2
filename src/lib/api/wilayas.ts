@@ -16,9 +16,10 @@ interface CommuneSingleResponse {
   data: Commune;
 }
 
-/** Shipping price + delivery days are the only editable fields per wilaya. */
+/** Shipping prices + delivery days are the only editable fields per wilaya. */
 export interface WilayaUpdate {
-  shippingPrice: number;
+  shippingPrice: number; // home delivery
+  stopDeskPrice: number; // point-relais / stop-desk
   deliveryDays: number;
 }
 
@@ -29,6 +30,7 @@ export interface WilayaCreate {
   nameAr: string;
   region: "Nord" | "Centre" | "Est" | "Ouest" | "Sud";
   shippingPrice: number;
+  stopDeskPrice: number;
   deliveryDays: number;
 }
 
@@ -73,6 +75,7 @@ export const wilayasApi = {
           nameAr: payload.nameAr,
           region: payload.region,
           shippingPrice: payload.shippingPrice,
+          stopDeskPrice: payload.stopDeskPrice,
           deliveryDays: payload.deliveryDays,
         },
         { auth: "admin" }

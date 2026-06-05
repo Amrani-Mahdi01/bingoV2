@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import Link, { type LinkProps } from "next/link";
+import { type LinkProps } from "next/link";
+
+import { LocaleLink as Link, useLocalize } from "@/components/ui/locale-link";
 
 type TentLinkProps = LinkProps & {
   className?: string;
@@ -22,6 +24,7 @@ export function TentLink({
   className,
   ...props
 }: TentLinkProps) {
+  const localize = useLocalize();
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event);
     if (event.defaultPrevented) return;
@@ -47,12 +50,14 @@ export function TentLink({
     }
 
     event.preventDefault();
-    const target =
+    const raw =
       typeof href === "string"
         ? href
         : (href.pathname ?? "/") +
           (href.search ? `?${href.search}` : "") +
           (href.hash ? `#${href.hash}` : "");
+    // Keep the programmatic (overlay) navigation in the active locale too.
+    const target = localize(raw);
 
     window.dispatchEvent(
       new CustomEvent("tent-navigate", { detail: { href: target } })

@@ -5,13 +5,26 @@ import { ArrowRight } from "lucide-react";
 
 import { TentLink } from "@/components/ui/tent-link";
 import { useLanguage } from "@/lib/i18n";
+import { useSiteHome } from "@/lib/site-home-context";
 
 /**
  * Promotions banner — full-width forest-themed card with a backdrop
- * photo, headline, lead, and a single tangerine CTA into /promotions.
+ * photo, headline, lead, and a single tangerine CTA. All copy is driven
+ * by the live promo snapshot (`promoStats`) computed server-side in
+ * `getServerSiteHome()`, so the title/subtitle always reflect the real
+ * number of active promotions and the highest discount currently live.
+ * Renders nothing when no promo product is active.
  */
 export function Promotions() {
   const { t } = useLanguage();
+  const home = useSiteHome();
+  const { count, maxDiscount } = home.promoStats;
+  if (count <= 0) return null;
+  // Title prefers the discount-driven phrasing when a max % is known;
+  // falls back to a count-only line otherwise. The subtitle always
+  // states the live count so the figure is verifiable.
+  const titleKey =
+    maxDiscount != null ? "promo.title.withDiscount" : "promo.title.countOnly";
   return (
     <section
       aria-labelledby="promotions-title"
@@ -62,10 +75,10 @@ export function Promotions() {
                 id="promotions-title"
                 className="mt-3 font-display text-3xl font-bold leading-[1.05] tracking-[-0.02em] sm:text-4xl md:text-[2.5rem]"
               >
-                {t("promo.title")}
+                {t(titleKey, { discount: maxDiscount ?? 0 })}
               </h2>
               <p className="mt-4 max-w-md text-sm leading-relaxed text-cream/80 sm:mt-5 sm:text-base">
-                {t("promo.subtitle")}
+                {t("promo.subtitle", { count })}
               </p>
               <TentLink
                 href="/catalogue?promo=1"

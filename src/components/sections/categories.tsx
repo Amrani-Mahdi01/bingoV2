@@ -1,51 +1,29 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
 import { ArrowUpRight } from "lucide-react";
 
 import { TentLink } from "@/components/ui/tent-link";
 import { useLanguage } from "@/lib/i18n";
+import { useSiteCategories } from "@/lib/site-categories-context";
+import type { SiteCategory } from "@/lib/site-categories";
 import { cn } from "@/lib/utils";
 
 /**
- * Categories grid — colorful icon tiles.
- *
- * Each tile = a cream rounded square holding one of the brand's flat
- * PNG icons (public/categories/*.png), with the category name +
- * product count stacked below. Some PNGs are reused across categories
- * until dedicated artwork is available.
+ * Categories grid — colorful icon tiles fed by /api/categories via the
+ * SiteCategoriesProvider (server-seeded in the root layout). Renders
+ * the top-level categories the admin has set up — empty when there
+ * are none. Cap the list to 9 tiles on mobile/tablet and 8 on lg+ to
+ * keep a clean row layout.
  */
-
-/** Names live in i18n under `category.{slug}`; we only carry the slug
- *  + icon + count here. */
-type Category = {
-  slug: string;
-  productCount: number;
-  icon: string;
-};
-
-const CATEGORIES: Category[] = [
-  { slug: "tentes",            productCount: 18, icon: "/categories/camping-tent.png" },
-  { slug: "sacs-a-dos",        productCount: 32, icon: "/categories/backpack.png" },
-  { slug: "chaussures",        productCount: 24, icon: "/categories/boots.png" },
-  { slug: "eclairage",         productCount: 15, icon: "/categories/flashlight.png" },
-  { slug: "navigation",        productCount: 11, icon: "/categories/map.png" },
-  { slug: "campement",         productCount: 28, icon: "/categories/bonfire.png" },
-  { slug: "sacs-de-couchage",  productCount: 14, icon: "/categories/camping-tent.png" },
-  { slug: "cuisine",           productCount: 19, icon: "/categories/bonfire.png" },
-  { slug: "hydratation",       productCount: 12, icon: "/categories/map.png" },
-  { slug: "vetements",         productCount: 22, icon: "/categories/backpack.png" },
-  { slug: "rechauds",          productCount: 9,  icon: "/categories/bonfire.png" },
-  { slug: "couteaux",          productCount: 17, icon: "/categories/map.png" },
-  { slug: "accessoires",       productCount: 25, icon: "/categories/boots.png" },
-  { slug: "sacs-etanches",     productCount: 8,  icon: "/categories/backpack.png" },
-  { slug: "tapis-matelas",     productCount: 13, icon: "/categories/camping-tent.png" },
-  { slug: "securite",          productCount: 7,  icon: "/categories/flashlight.png" },
-];
-
 export function Categories() {
   const { t } = useLanguage();
+  const { list } = useSiteCategories();
+  // Don't render the section at all if the admin hasn't configured any
+  // categories yet — better than an empty grid + lonely header.
+  if (list.length === 0) return null;
+  const tiles = list.slice(0, 9);
   return (
     <section
       aria-labelledby="categories-title"
@@ -53,7 +31,7 @@ export function Categories() {
     >
       <div className="mx-auto w-full max-w-7xl px-6 md:px-10">
         <SectionHeader
-          eyebrow={t("categories.eyebrow")}
+          eyebrow={t("categories.eyebrow", { n: list.length })}
           title={t("categories.title")}
           subtitle={t("categories.subtitle")}
           ctaLabel={t("categories.cta")}
@@ -61,7 +39,7 @@ export function Categories() {
         />
 
         <ul className="mt-10 grid grid-cols-3 gap-4 sm:gap-5 md:mt-12 md:grid-cols-6 md:gap-5 lg:grid-cols-8">
-          {CATEGORIES.slice(0, 9).map((c, i) => (
+          {tiles.map((c, i) => (
             <li
               key={c.slug}
               // 9 tiles total on mobile/tablet (3×3 / 6+3), but on
@@ -69,7 +47,7 @@ export function Categories() {
               // hidden to keep a clean single row.
               className={i === 8 ? "lg:hidden" : undefined}
             >
-              <CategoryCard {...c} />
+              <CategoryCard category={c} />
             </li>
           ))}
         </ul>
@@ -127,15 +105,18 @@ function SectionHeader({
 }
 
 /* ───── Category card — colorful icon tile + label stacked below ───── */
-function CategoryCard({
-  slug,
-  productCount,
-  icon,
-}: Category) {
-  const { t } = useLanguage();
+function CategoryCard({ category }: { category: SiteCategory }) {
+  const { t, lang } = useLanguage();
+  const name =
+    (lang === "ar" && category.nameAr ? category.nameAr : category.nameFr) ||
+    category.slug;
+  // The admin uploads a square PNG/JPG per top-level category. Fall
+  // back to the legacy /categories/*.png assets when the DB row has
+  // no image yet — they still ship with the project as defaults.
+  const image = category.image || "/categories/camping-tent.png";
   return (
     <TentLink
-      href={`/catalogue?category=${slug}`}
+      href={`/catalogue?category=${encodeURIComponent(category.slug)}`}
       className={cn(
         "group flex flex-col items-center gap-2.5 text-center",
         "focus-visible:outline-none"
@@ -153,7 +134,7 @@ function CategoryCard({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={icon}
+          src={image}
           alt=""
           aria-hidden
           loading="lazy"
@@ -163,11 +144,14 @@ function CategoryCard({
 
       {/* Label + count */}
       <div className="flex w-full min-w-0 flex-col items-center">
-        <span className="w-full truncate font-display text-[13px] font-semibold leading-tight text-forest-900 transition-colors group-hover:text-tangerine-700 sm:text-sm">
-          {t(`category.${slug}`)}
+        <span
+          className="w-full truncate font-display text-[13px] font-semibold leading-tight text-forest-900 transition-colors group-hover:text-tangerine-700 sm:text-sm"
+          dir={lang === "ar" ? "rtl" : "ltr"}
+        >
+          {name}
         </span>
         <span className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-wood-600">
-          {t("categories.products", { n: productCount })}
+          {t("categories.products", { n: category.productCount })}
         </span>
       </div>
     </TentLink>

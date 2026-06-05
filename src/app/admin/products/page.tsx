@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Download, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -23,6 +23,7 @@ import { StockPill } from "@/components/admin/StockPill";
 import { brandsApi, type ApiBrand } from "@/lib/api/brands";
 import { categoriesApi, type ApiCategory } from "@/lib/api/categories";
 import { productsApi, type ApiProduct } from "@/lib/api/products";
+import { downloadCSV, toCSV } from "@/lib/csv";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { formatDZD } from "@/lib/format";
@@ -107,8 +108,34 @@ function adaptBrand(b: ApiBrand): Brand {
 
 const PAGE_SIZE = 20;
 
+/** CSV column contract — export writes these in this order, import
+ *  matches by header name (so column reordering in Excel is fine). */
+const CSV_HEADERS = [
+  "sku",
+  "slug",
+  "nameFr",
+  "nameAr",
+  "categoryName",
+  "brandName",
+  "price",
+  "oldPrice",
+  "stock",
+  "lowStockThreshold",
+  "isActive",
+  "isFeatured",
+  "isNew",
+  "isBestSeller",
+  "isPromo",
+  "descriptionShortFr",
+  "descriptionShortAr",
+] as const;
+
 export default function AdminProductsPage() {
   const [allProducts, setAllProducts] = React.useState<Product[] | null>(null);
+  // Raw API products kept around so bulk-update calls have access to
+  // every column (categoryId, brandId, descriptions, etc.) which the
+  // storefront-shaped `Product` adapter drops.
+  const [allRawProducts, setAllRawProducts] = React.useState<ApiProduct[]>([]);
   const [allCategories, setAllCategories] = React.useState<Category[]>([]);
   const [allBrands, setAllBrands] = React.useState<Brand[]>([]);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
@@ -118,14 +145,20 @@ export default function AdminProductsPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [promoOnly, setPromoOnly] = React.useState(false);
   const [page, setPage] = React.useState(1);
+  // Server-reported counts — drive the pagination footer so it shows
+  // the true catalogue size even when only the current 20 rows are
+  // loaded. Falls back to client-derived numbers before the first
+  // response lands.
+  const [serverMeta, setServerMeta] = React.useState<{
+    total: number;
+    lastPage: number;
+  } | null>(null);
   const confirm = useConfirm();
 
-  const load = React.useCallback(async () => {
+  // Categories + brands rarely change — load them once.
+  const loadMeta = React.useCallback(async () => {
     try {
-      const [res, cats, brands] = await Promise.all([
-        // Pull up to 100 (current Laravel cap) — pagination on the server
-        // will be wired when the catalog grows.
-        productsApi.listAll({ perPage: 100 }),
+      const [cats, brands] = await Promise.all([
         categoriesApi.listAll(),
         brandsApi.listAll(),
       ]);
@@ -134,19 +167,58 @@ export default function AdminProductsPage() {
         flatCats.push(top);
         for (const sub of top.children ?? []) flatCats.push(sub);
       }
-      setAllProducts(res.data.map(adaptProduct));
       setAllCategories(flatCats.map(adaptCategory));
       setAllBrands(brands.map(adaptBrand));
     } catch (err) {
-      console.error("[admin/products] load failed", err);
-      toast.error("Impossible de charger les produits");
-      setAllProducts([]);
+      console.error("[admin/products] meta load failed", err);
     }
   }, []);
 
+  // Products fetch — paginated on the backend at PAGE_SIZE per request.
+  // Search is pushed to the server so it spans the whole catalogue;
+  // the other dropdown filters (category, brand, status, promo) remain
+  // client-side and apply within the loaded page only.
+  const loadProducts = React.useCallback(
+    async (opts: { page: number; q?: string }) => {
+      try {
+        const res = await productsApi.listAll({
+          page: opts.page,
+          perPage: PAGE_SIZE,
+          q: opts.q?.trim() || undefined,
+        });
+        setAllProducts(res.data.map(adaptProduct));
+        setAllRawProducts(res.data);
+        setServerMeta({
+          total: res.meta?.total ?? res.data.length,
+          lastPage: res.meta?.lastPage ?? 1,
+        });
+      } catch (err) {
+        console.error("[admin/products] load failed", err);
+        toast.error("Impossible de charger les produits");
+        setAllProducts([]);
+        setServerMeta({ total: 0, lastPage: 1 });
+      }
+    },
+    [],
+  );
+
+  const load = React.useCallback(async () => {
+    await Promise.all([loadMeta(), loadProducts({ page, q: search })]);
+  }, [loadMeta, loadProducts, page, search]);
+
   React.useEffect(() => {
-    void load();
-  }, [load]);
+    void loadMeta();
+  }, [loadMeta]);
+
+  // Debounce search so we don't hammer the backend on every keystroke,
+  // and reset to page 1 whenever the query changes so the user always
+  // lands on the first results page.
+  React.useEffect(() => {
+    const id = window.setTimeout(() => {
+      void loadProducts({ page, q: search });
+    }, 250);
+    return () => window.clearTimeout(id);
+  }, [loadProducts, page, search]);
 
   const deleteProduct = async (p: Product) => {
     const ok = await confirm({
@@ -190,6 +262,14 @@ export default function AdminProductsPage() {
     return slugs;
   }, [categoryFilter, allCategories]);
 
+  // Quick lookup for the Statut column + filter — adapted Product drops
+  // isActive, but we keep the raw API rows around in `allRawProducts`.
+  const activeById = React.useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const p of allRawProducts) m.set(p.id, p.isActive);
+    return m;
+  }, [allRawProducts]);
+
   const filtered = React.useMemo(() => {
     if (!allProducts) return null;
     return allProducts.filter((p) => {
@@ -203,14 +283,35 @@ export default function AdminProductsPage() {
       if (categoryFilterSet && !categoryFilterSet.has(p.category.slug))
         return false;
       if (brandFilter !== "all" && p.brand.slug !== brandFilter) return false;
-      if (statusFilter !== "all" && p.stockStatus !== statusFilter) return false;
+      // Statut handles two unrelated axes via the same dropdown:
+      // visibility (active/inactive) + stock state.
+      if (statusFilter === "active") {
+        if (activeById.get(p.id) !== true) return false;
+      } else if (statusFilter === "inactive") {
+        if (activeById.get(p.id) !== false) return false;
+      } else if (statusFilter !== "all" && p.stockStatus !== statusFilter) {
+        return false;
+      }
       if (promoOnly && !p.isPromo) return false;
       return true;
     });
-  }, [allProducts, search, categoryFilterSet, brandFilter, statusFilter, promoOnly]);
+  }, [
+    allProducts,
+    activeById,
+    search,
+    categoryFilterSet,
+    brandFilter,
+    statusFilter,
+    promoOnly,
+  ]);
 
-  const visible = filtered?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) ?? [];
-  const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / PAGE_SIZE));
+  // The server already paginated for us — `filtered` is the current
+  // page after the client-side dropdown filters narrow it further. We
+  // surface the server's totals in the footer so users see the real
+  // catalogue size, not just the count visible on this page.
+  const visible = filtered ?? [];
+  const totalPages = serverMeta?.lastPage ?? 1;
+  const totalCount = serverMeta?.total ?? filtered?.length ?? 0;
 
   const toggleAllVisible = () => {
     setSelected((prev) => {
@@ -231,6 +332,219 @@ export default function AdminProductsPage() {
     setSelected(new Set());
   };
 
+  /** Bulk toggle the `is_active` flag on every selected product. */
+  const bulkSetActive = async (next: boolean) => {
+    if (selected.size === 0) return;
+    const targets = allRawProducts.filter((p) => selected.has(p.id));
+    // Only touch rows that would actually change state.
+    const todo = targets.filter((p) => p.isActive !== next);
+    if (todo.length === 0) {
+      toast.info(
+        next
+          ? "Les produits sélectionnés sont déjà actifs."
+          : "Les produits sélectionnés sont déjà inactifs."
+      );
+      setSelected(new Set());
+      return;
+    }
+
+    const n = todo.length;
+    const verbInf = next ? "Activer" : "Désactiver";
+    const ok = await confirm({
+      title:
+        n === 1
+          ? `${verbInf} « ${todo[0]!.nameFr} » ?`
+          : `${verbInf} ${n} produits ?`,
+      message: (
+        <>
+          {next
+            ? `${n === 1 ? "Le produit sera" : "Les produits seront"} visible${n > 1 ? "s" : ""} sur la boutique immédiatement.`
+            : `${n === 1 ? "Le produit sera" : "Les produits seront"} masqué${n > 1 ? "s" : ""} de la boutique. Vous pouvez l'activer à nouveau à tout moment.`}
+          {n <= 8 ? (
+            <span className="mt-2 block text-xs text-zinc-600">
+              {todo.map((p) => p.nameFr).join(", ")}
+            </span>
+          ) : null}
+        </>
+      ),
+      confirmLabel: n === 1 ? verbInf : `${verbInf} (${n})`,
+      variant: next ? "default" : "destructive",
+    });
+    if (!ok) return;
+
+    let okCount = 0;
+    let failCount = 0;
+    for (const p of todo) {
+      if (!p.categoryId || !p.brandId) {
+        failCount++;
+        continue;
+      }
+      try {
+        await productsApi.update(p.id, {
+          slug: p.slug,
+          sku: p.sku,
+          nameFr: p.nameFr,
+          nameAr: p.nameAr,
+          descriptionShortFr: p.descriptionShortFr,
+          descriptionShortAr: p.descriptionShortAr,
+          descriptionFr: p.descriptionFr,
+          descriptionAr: p.descriptionAr,
+          categoryId: Number(p.categoryId),
+          brandId: Number(p.brandId),
+          price: p.price,
+          oldPrice: p.oldPrice,
+          stock: p.stock,
+          lowStockThreshold: p.lowStockThreshold,
+          trackStock: p.trackStock,
+          allowBackorder: p.allowBackorder,
+          isActive: next,
+          isFeatured: p.isFeatured,
+          isNew: p.isNew,
+          isBestSeller: p.isBestSeller,
+          isPromo: p.isPromo,
+        });
+        okCount++;
+      } catch (err) {
+        failCount++;
+        console.error(`[admin/products] bulk active failed for ${p.sku}`, err);
+      }
+    }
+    setSelected(new Set());
+    const verb = next ? "activé" : "désactivé";
+    if (okCount > 0) {
+      toast.success(
+        `${okCount} produit${okCount > 1 ? "s" : ""} ${verb}${okCount > 1 ? "s" : ""}`
+      );
+    }
+    if (failCount > 0) {
+      toast.error(
+        `${failCount} échec${failCount > 1 ? "s" : ""} lors de la mise à jour`
+      );
+    }
+    await load();
+  };
+
+  /** Bulk delete the selected products with a single confirmation. */
+  const bulkDelete = async () => {
+    if (selected.size === 0 || !allProducts) return;
+    const targets = allProducts.filter((p) => selected.has(p.id));
+    const n = targets.length;
+    if (n === 0) return;
+    const ok = await confirm({
+      title:
+        n === 1
+          ? `Supprimer « ${targets[0]!.name} » ?`
+          : `Supprimer ${n} produits ?`,
+      message: (
+        <>
+          {n === 1 ? "Le produit" : "Les produits"} sélectionné
+          {n > 1 ? "s" : ""},{" "}
+          {n > 1 ? "leurs photos et leurs" : "ses photos et ses"} variantes
+          seront supprimés définitivement. Cette action est irréversible.
+          {n <= 8 ? (
+            <span className="mt-2 block text-xs text-zinc-600">
+              {targets.map((p) => p.name).join(", ")}
+            </span>
+          ) : null}
+        </>
+      ),
+      confirmLabel: n === 1 ? "Supprimer" : `Supprimer (${n})`,
+      variant: "destructive",
+    });
+    if (!ok) return;
+
+    let okCount = 0;
+    let failCount = 0;
+    for (const p of targets) {
+      try {
+        await productsApi.destroy(p.id);
+        okCount++;
+      } catch (err) {
+        failCount++;
+        console.error(`[admin/products] bulk delete failed for ${p.sku}`, err);
+      }
+    }
+    setSelected(new Set());
+    if (okCount > 0) {
+      toast.success(`${okCount} produit${okCount > 1 ? "s" : ""} supprimé${okCount > 1 ? "s" : ""}`);
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount} échec${failCount > 1 ? "s" : ""} lors de la suppression`);
+    }
+    await load();
+  };
+
+  /* ─────────────────────────── CSV export ───────────────────────────
+     Two entry points:
+       - exportCsv()         → header button, dumps the filtered list
+       - exportSelectedCsv() → bulk-action button, dumps only ticked rows
+     Both funnel through the same downloader so the column set + file
+     naming stays a single source of truth. */
+  const downloadProductsAsCsv = (ids: Iterable<string>, fileTag: string) => {
+    const idSet = new Set(ids);
+    if (idSet.size === 0) {
+      toast.info("Rien à exporter.");
+      return;
+    }
+    const catById = new Map(allCategories.map((c) => [c.id, c]));
+    const brandById = new Map(allBrands.map((b) => [b.id, b]));
+
+    const rows: string[][] = [CSV_HEADERS.slice()];
+    for (const raw of allRawProducts) {
+      if (!idSet.has(raw.id)) continue;
+      const cat = raw.categoryId ? catById.get(raw.categoryId) : null;
+      const brand = raw.brandId ? brandById.get(raw.brandId) : null;
+      rows.push([
+        raw.sku ?? "",
+        raw.slug ?? "",
+        raw.nameFr ?? "",
+        raw.nameAr ?? "",
+        cat?.name ?? "",
+        brand?.name ?? "",
+        String(raw.price ?? 0),
+        raw.oldPrice == null ? "" : String(raw.oldPrice),
+        String(raw.stock ?? 0),
+        String(raw.lowStockThreshold ?? 0),
+        raw.isActive ? "1" : "0",
+        raw.isFeatured ? "1" : "0",
+        raw.isNew ? "1" : "0",
+        raw.isBestSeller ? "1" : "0",
+        raw.isPromo ? "1" : "0",
+        raw.descriptionShortFr ?? "",
+        raw.descriptionShortAr ?? "",
+      ]);
+    }
+    const exported = rows.length - 1;
+    if (exported === 0) {
+      toast.info("Aucun produit correspondant.");
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCSV(`bingo-produits-${fileTag}-${stamp}.csv`, toCSV(rows));
+    toast.success(
+      `${exported} produit${exported > 1 ? "s" : ""} exporté${exported > 1 ? "s" : ""}`,
+    );
+  };
+
+  const exportCsv = () => {
+    if (!filtered || filtered.length === 0) {
+      toast.info("Rien à exporter — la liste filtrée est vide.");
+      return;
+    }
+    downloadProductsAsCsv(
+      filtered.map((p) => p.id),
+      "tous",
+    );
+  };
+
+  const exportSelectedCsv = () => {
+    if (selected.size === 0) return;
+    downloadProductsAsCsv(selected, "selection");
+    // Selection stays — admin might want to export again or apply
+    // another bulk action without re-ticking. Different from
+    // bulkSetActive/bulkDelete which intentionally clear after.
+  };
+
   return (
     <>
       <AdminPageHeader
@@ -245,14 +559,8 @@ export default function AdminProductsPage() {
           <>
             <button
               type="button"
-              onClick={() => toast.info("Import CSV — backend à venir")}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              <Upload className="size-3.5" /> Importer CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => toast.info("Export en cours…")}
+              onClick={exportCsv}
+              disabled={!filtered || filtered.length === 0}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
               <Download className="size-3.5" /> Exporter
@@ -267,9 +575,11 @@ export default function AdminProductsPage() {
         }
       />
 
-      {/* Filter bar — borderless single row */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[260px] flex-1 max-w-md">
+      {/* Filter bar — mobile = 2-col grid (search spans both, then
+          2 selects per row, status + promo on the last row). Desktop
+          (sm+) reverts to the original wrapping single-row layout. */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+        <div className="relative col-span-2 sm:col-span-1 sm:min-w-[260px] sm:flex-1 sm:max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400" />
           <Input
             value={search}
@@ -287,7 +597,7 @@ export default function AdminProductsPage() {
             setCategoryFilter(v);
             setPage(1);
           }}
-          placeholder="Catégorie"
+          label="Catégorie"
           options={[
             { value: "all", label: "Toutes catégories" },
             // Flat list with sub-categories indented under their parent.
@@ -312,7 +622,7 @@ export default function AdminProductsPage() {
             setBrandFilter(v);
             setPage(1);
           }}
-          placeholder="Marque"
+          label="Marque"
           options={[
             { value: "all", label: "Toutes marques" },
             ...allBrands.map((b) => ({ value: b.slug, label: b.name })),
@@ -324,15 +634,17 @@ export default function AdminProductsPage() {
             setStatusFilter(v);
             setPage(1);
           }}
-          placeholder="Statut"
+          label="Statut"
           options={[
             { value: "all", label: "Tous statuts" },
+            { value: "active", label: "Actif" },
+            { value: "inactive", label: "Inactif" },
             { value: "in_stock", label: "En stock" },
             { value: "low_stock", label: "Stock faible" },
             { value: "out_of_stock", label: "Rupture" },
           ]}
         />
-        <label className="ml-auto inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs">
+        <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-xs sm:ml-auto">
           <Checkbox
             checked={promoOnly}
             onCheckedChange={(v) => {
@@ -340,7 +652,7 @@ export default function AdminProductsPage() {
               setPage(1);
             }}
           />
-          <span className="text-zinc-700">Promo uniquement</span>
+          <span className="truncate text-zinc-700">Promo uniquement</span>
         </label>
       </div>
 
@@ -352,26 +664,165 @@ export default function AdminProductsPage() {
             {selected.size > 1 ? "s" : ""}
           </span>
           <div className="ml-auto flex flex-wrap gap-1.5">
-            {["Activer", "Désactiver", "Supprimer", "Modifier prix…"].map(
-              (label) => (
-                <Button
-                  key={label}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => bulkAction(label)}
-                  className="h-7 border-blue-300 bg-white text-xs text-blue-900 hover:bg-blue-100"
-                >
-                  {label}
-                </Button>
-              )
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={exportSelectedCsv}
+              className="h-7 border-blue-300 bg-white text-xs text-blue-900 hover:bg-blue-100"
+            >
+              <Download className="size-3.5" />
+              Exporter
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void bulkSetActive(true)}
+              className="h-7 border-blue-300 bg-white text-xs text-blue-900 hover:bg-blue-100"
+            >
+              Activer
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void bulkSetActive(false)}
+              className="h-7 border-blue-300 bg-white text-xs text-blue-900 hover:bg-blue-100"
+            >
+              Désactiver
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void bulkDelete()}
+              className="h-7 border-red-300 bg-white text-xs text-red-700 hover:bg-red-50"
+            >
+              Supprimer
+            </Button>
           </div>
         </div>
       ) : null}
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-md border border-zinc-200 bg-white">
+      {/* Mobile (< md): card list — the 9-column table is unreadable on
+          a phone. Same pattern as /admin/orders: most-important fields
+          stacked, full-row tap targets, actions inline. */}
+      <ul className="divide-y divide-zinc-100 overflow-hidden rounded-md border border-zinc-200 bg-white md:hidden">
+        {visible.map((p) => {
+          const isChecked = selected.has(p.id);
+          const isActive = activeById.get(p.id);
+          return (
+            <li
+              key={p.id}
+              className={cn(
+                "flex flex-col gap-1.5 px-3 py-2.5",
+                isChecked ? "bg-blue-50/60" : "bg-white",
+              )}
+            >
+              {/* Top row — selection + image + name/sku + actions */}
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  checked={isChecked}
+                  onCheckedChange={(v) => {
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (v) next.add(p.id);
+                      else next.delete(p.id);
+                      return next;
+                    });
+                  }}
+                  aria-label={`Sélectionner ${p.name}`}
+                  className="mt-1"
+                />
+                <span className="relative size-12 shrink-0 overflow-hidden rounded border border-zinc-200 bg-zinc-50">
+                  <Image
+                    src={p.images[0]?.url ?? "/api/placeholder/80/80"}
+                    alt=""
+                    fill
+                    sizes="48px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={routes.admin.product(p.id)}
+                    className="line-clamp-2 text-xs font-semibold leading-tight text-zinc-900 hover:text-blue-600"
+                  >
+                    {p.name}
+                  </Link>
+                  <span className="mt-0.5 block font-mono text-[10px] text-zinc-500">
+                    {p.sku}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Link
+                    href={routes.admin.product(p.id)}
+                    aria-label={`Éditer ${p.name}`}
+                    title="Éditer"
+                    className="inline-flex size-6 items-center justify-center rounded text-zinc-500 hover:bg-blue-50 hover:text-blue-700"
+                  >
+                    <Pencil className="size-3.5" />
+                  </Link>
+                  <button
+                    type="button"
+                    aria-label={`Supprimer ${p.name}`}
+                    title="Supprimer"
+                    onClick={() => void deleteProduct(p)}
+                    className="inline-flex size-6 items-center justify-center rounded text-zinc-500 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Meta — category · brand */}
+              <p className="ps-[3.75rem] truncate text-[10px] text-zinc-500">
+                {p.category.name}
+                <span className="text-zinc-400"> · {p.brand.name}</span>
+              </p>
+
+              {/* Price + stock + status */}
+              <div className="ps-[3.75rem] flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {isActive ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide text-emerald-700">
+                      <span aria-hidden className="size-1 rounded-full bg-emerald-500" />
+                      Actif
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide text-zinc-500">
+                      <span aria-hidden className="size-1 rounded-full bg-zinc-400" />
+                      Inactif
+                    </span>
+                  )}
+                  <span className="font-mono text-[10px] text-zinc-700">
+                    Stock {p.stock}
+                  </span>
+                  <StockPill status={p.stockStatus} compact />
+                </div>
+                <span className="font-mono text-xs font-semibold tabular-nums text-zinc-900">
+                  {formatDZD(p.price)}
+                  {p.oldPrice ? (
+                    <span className="ms-1 font-normal text-[10px] text-zinc-400 line-through">
+                      {formatDZD(p.oldPrice)}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+
+              {/* Views + sales */}
+              <p className="ps-[3.75rem] font-mono text-[10px] text-zinc-500">
+                {p.viewCount} vues · {p.soldCount} ventes
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* md+: original wide table. Hidden on mobile (card list replaces it). */}
+      <div className="hidden overflow-hidden rounded-md border border-zinc-200 bg-white md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -391,6 +842,7 @@ export default function AdminProductsPage() {
                 <th className="px-4 py-3 font-medium">Marque</th>
                 <th className="px-4 py-3 font-medium text-right">Prix</th>
                 <th className="px-4 py-3 font-medium">Stock</th>
+                <th className="px-4 py-3 font-medium">Statut</th>
                 <th className="px-4 py-3 font-medium text-right">Vues</th>
                 <th className="px-4 py-3 font-medium text-right">Ventes</th>
                 <th className="w-20 px-2 py-3 font-medium text-center" aria-label="Actions" />
@@ -471,6 +923,25 @@ export default function AdminProductsPage() {
                         <StockPill status={p.stockStatus} compact />
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      {activeById.get(p.id) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-emerald-700">
+                          <span
+                            aria-hidden
+                            className="size-1.5 rounded-full bg-emerald-500"
+                          />
+                          Actif
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-zinc-500">
+                          <span
+                            aria-hidden
+                            className="size-1.5 rounded-full bg-zinc-400"
+                          />
+                          Inactif
+                        </span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono tabular-nums text-zinc-500">
                       {p.viewCount}
                     </td>
@@ -510,8 +981,8 @@ export default function AdminProductsPage() {
       {filtered && filtered.length > 0 ? (
         <div className="mt-4 flex items-center justify-between">
           <Body className="text-xs text-zinc-500">
-            Page {page} sur {totalPages} · {filtered.length} produit
-            {filtered.length > 1 ? "s" : ""}
+            Page {page} sur {totalPages} · {totalCount} produit
+            {totalCount > 1 ? "s" : ""}
           </Body>
           <div className="flex gap-2">
             <Button
@@ -554,17 +1025,30 @@ function FilterSelect({
   value,
   onChange,
   options,
-  placeholder,
+  label,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string }>;
-  placeholder?: string;
+  /** Always-visible field name so the admin knows which filter this is. */
+  label: string;
 }) {
+  const selected = options.find((o) => o.value === value);
+  const isAll = !value || value === "all";
   return (
     <Select value={value} onValueChange={(v) => v && onChange(v)}>
-      <SelectTrigger className="h-9 w-[180px] border-zinc-200 bg-white text-xs">
-        <SelectValue placeholder={placeholder} />
+      <SelectTrigger
+        size="sm"
+        className="w-full border-zinc-200 bg-white text-xs sm:w-[200px]"
+      >
+        <span className="flex w-full min-w-0 items-center gap-1.5">
+          <span className="shrink-0 truncate text-2xs font-medium uppercase tracking-wide text-zinc-400">
+            {label}
+          </span>
+          <span className="truncate text-zinc-900">
+            {isAll ? "—" : selected?.label ?? value}
+          </span>
+        </span>
       </SelectTrigger>
       <SelectContent>
         {options.map((o) => (

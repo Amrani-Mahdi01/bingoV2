@@ -71,22 +71,29 @@ export function HorizontalBars({
 }) {
   const ceiling = max ?? Math.max(0, ...data.map((d) => d.value));
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-3 sm:space-y-2">
       {data.map((d, i) => {
         const ratio = ceiling === 0 ? 0 : d.value / ceiling;
         return (
-          <li key={d.label + i} className="flex items-center gap-3 text-xs">
-            <span className="w-32 shrink-0 truncate text-zinc-900">
-              {d.label}
-            </span>
-            <span className="relative h-5 flex-1 overflow-hidden rounded-md bg-zinc-100">
+          <li
+            key={d.label + i}
+            className="flex flex-col gap-1.5 text-xs sm:flex-row sm:items-center sm:gap-3"
+          >
+            {/* Mobile: label + value on one row above the bar.
+                Desktop (sm+): everything inline. */}
+            <div className="flex items-center justify-between gap-3 sm:contents">
+              <span className="min-w-0 flex-1 truncate text-zinc-900 sm:w-32 sm:flex-none sm:shrink-0">
+                {d.label}
+              </span>
+              <span className="order-3 shrink-0 font-mono tabular-nums text-zinc-700 sm:w-20 sm:text-right">
+                {formatValue(d.value)}
+              </span>
+            </div>
+            <span className="relative h-5 w-full overflow-hidden rounded-md bg-zinc-100 sm:order-2 sm:flex-1">
               <span
                 className="absolute inset-y-0 left-0 rounded-md bg-blue-500"
                 style={{ width: `${ratio * 100}%` }}
               />
-            </span>
-            <span className="w-20 shrink-0 text-right font-mono tabular-nums text-zinc-700">
-              {formatValue(d.value)}
             </span>
           </li>
         );
@@ -102,7 +109,7 @@ export function Funnel({
 }) {
   const max = steps[0]?.value ?? 1;
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-3 sm:space-y-2">
       {steps.map((s, i) => {
         const ratio = max === 0 ? 0 : s.value / max;
         const conversion =
@@ -110,19 +117,28 @@ export function Funnel({
             ? null
             : (s.value / steps[i - 1]!.value) * 100;
         return (
-          <li key={s.label} className="flex items-center gap-3 text-xs">
-            <span className="w-28 shrink-0 text-zinc-900">{s.label}</span>
-            <span className="relative h-7 flex-1 overflow-hidden rounded-md bg-zinc-100">
+          <li
+            key={s.label}
+            className="flex flex-col gap-1.5 text-xs sm:flex-row sm:items-center sm:gap-3"
+          >
+            {/* Mobile: label + value + % stacked above the bar.
+                Desktop: inline 4-column layout. */}
+            <div className="flex items-center justify-between gap-3 sm:contents">
+              <span className="min-w-0 flex-1 truncate text-zinc-900 sm:w-28 sm:flex-none sm:shrink-0">
+                {s.label}
+              </span>
+              <span className="order-3 shrink-0 font-mono tabular-nums text-zinc-900 sm:w-16 sm:text-right">
+                {s.value.toLocaleString("fr-DZ")}
+              </span>
+              <span className="order-4 shrink-0 text-2xs text-zinc-500 sm:w-12 sm:text-right">
+                {conversion === null ? "—" : `${conversion.toFixed(0)}%`}
+              </span>
+            </div>
+            <span className="relative h-7 w-full overflow-hidden rounded-md bg-zinc-100 sm:order-2 sm:flex-1">
               <span
-                className="absolute inset-y-0 left-0 rounded-md bg-gradient-to-r from-blue-600 to-emerald-500"
+                className="absolute inset-y-0 left-0 rounded-md bg-linear-to-r from-blue-600 to-emerald-500"
                 style={{ width: `${ratio * 100}%` }}
               />
-            </span>
-            <span className="w-16 shrink-0 text-right font-mono tabular-nums text-zinc-900">
-              {s.value.toLocaleString("fr-DZ")}
-            </span>
-            <span className="w-12 shrink-0 text-right text-2xs text-zinc-500">
-              {conversion === null ? "—" : `${conversion.toFixed(0)}%`}
             </span>
           </li>
         );

@@ -18,7 +18,8 @@ export interface Wilaya {
   name: string; // French
   nameAr: string; // Arabic
   region: WilayaRegion;
-  shippingPrice: number; // DZD
+  shippingPrice: number; // DZD — home delivery
+  stopDeskPrice: number; // DZD — point-relais / stop-desk delivery
   deliveryDays: number; // 2 .. 5
 }
 

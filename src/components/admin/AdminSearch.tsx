@@ -18,15 +18,24 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { api } from "@/lib/api/client";
+import {
+  customersApi,
+  type ApiCustomerRow,
+} from "@/lib/api/customers";
+import { ordersApi, type ApiOrderRow } from "@/lib/api/orders";
+import { productsApi, type ApiProduct } from "@/lib/api/products";
 import { routes } from "@/lib/routes";
-import type { Customer, Order, Product } from "@/lib/types";
 
 interface SearchData {
-  orders: Order[];
-  products: Product[];
-  customers: Customer[];
+  orders: ApiOrderRow[];
+  products: ApiProduct[];
+  customers: ApiCustomerRow[];
 }
+
+// One-shot fetch size when the dialog opens. The corpus stays in
+// memory for the rest of the session, so we trade a slightly larger
+// initial download for instant client-side filtering on every keystroke.
+const FETCH_PAGE_SIZE = 200;
 
 export function AdminSearch() {
   const router = useRouter();
@@ -47,36 +56,50 @@ export function AdminSearch() {
   }, []);
 
   // Lazy-load the search corpus the first time the dialog opens.
+  // Each promise has its own catch so one failure doesn't blank the
+  // others — the admin can still search orders if customers errors.
   React.useEffect(() => {
     if (!open || data) return;
+    let cancelled = false;
     Promise.all([
-      api.orders.list({ limit: 500 }),
-      api.products.list({ limit: 500 }),
-      api.customers.list({ limit: 500 }),
+      ordersApi.listAll({ perPage: FETCH_PAGE_SIZE }).catch(() => null),
+      productsApi.listAll({ perPage: FETCH_PAGE_SIZE }).catch(() => null),
+      customersApi.list().catch(() => null),
     ]).then(([o, p, c]) => {
-      setData({ orders: o.items, products: p.items, customers: c.items });
+      if (cancelled) return;
+      setData({
+        orders: o?.data ?? [],
+        products: p?.data ?? [],
+        customers: c?.data ?? [],
+      });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [open, data]);
 
   const results = React.useMemo(() => {
     if (!data) return { orders: [], products: [], customers: [] };
     const q = query.trim().toLowerCase();
     if (!q) {
-      // Show 5 most recent of each when empty.
+      // Show 5 most recent of each when the input is empty so the
+      // dialog never looks empty on open.
       return {
         orders: data.orders.slice(0, 5),
         products: data.products.slice(0, 5),
         customers: data.customers.slice(0, 5),
       };
     }
-    const matchOrder = (o: Order) =>
+    const matchOrder = (o: ApiOrderRow) =>
       `${o.orderNumber} ${o.customer.firstName} ${o.customer.lastName} ${o.customer.phone}`
         .toLowerCase()
         .includes(q);
-    const matchProduct = (p: Product) =>
-      `${p.name} ${p.sku} ${p.brand.name}`.toLowerCase().includes(q);
-    const matchCustomer = (c: Customer) =>
-      `${c.firstName} ${c.lastName} ${c.email} ${c.phone}`
+    const matchProduct = (p: ApiProduct) =>
+      `${p.nameFr} ${p.nameAr} ${p.sku} ${p.brand?.name ?? ""}`
+        .toLowerCase()
+        .includes(q);
+    const matchCustomer = (c: ApiCustomerRow) =>
+      `${c.firstName} ${c.lastName} ${c.email ?? ""} ${c.phone}`
         .toLowerCase()
         .includes(q);
     return {
@@ -140,7 +163,7 @@ export function AdminSearch() {
                   <CommandItem
                     key={o.id}
                     value={`order ${o.orderNumber} ${o.customer.firstName} ${o.customer.lastName} ${o.customer.phone}`}
-                    onSelect={() => go(routes.admin.order(o.orderNumber))}
+                    onSelect={() => go(routes.admin.order(o.id))}
                   >
                     <ShoppingCart className="size-4 text-zinc-500" />
                     <div className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -152,7 +175,7 @@ export function AdminSearch() {
                       </span>
                     </div>
                     <span className="font-mono text-2xs text-zinc-500">
-                      {o.shipping.wilayaName}
+                      {o.wilayaName}
                     </span>
                   </CommandItem>
                 ))}
@@ -169,21 +192,23 @@ export function AdminSearch() {
                 {results.products.map((p) => (
                   <CommandItem
                     key={p.id}
-                    value={`product ${p.name} ${p.sku} ${p.brand.name}`}
+                    value={`product ${p.nameFr} ${p.sku} ${p.brand?.name ?? ""}`}
                     onSelect={() => go(routes.admin.product(p.id))}
                   >
                     <Box className="size-4 text-zinc-500" />
                     <div className="flex min-w-0 flex-1 items-baseline gap-2">
                       <span className="line-clamp-1 text-xs font-medium">
-                        {p.name}
+                        {p.nameFr}
                       </span>
                       <span className="shrink-0 font-mono text-2xs text-zinc-500">
                         {p.sku}
                       </span>
                     </div>
-                    <span className="text-2xs text-zinc-500">
-                      {p.brand.name}
-                    </span>
+                    {p.brand?.name ? (
+                      <span className="text-2xs text-zinc-500">
+                        {p.brand.name}
+                      </span>
+                    ) : null}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -193,26 +218,43 @@ export function AdminSearch() {
 
           {results.customers.length > 0 ? (
             <CommandGroup heading="Clients">
-              {results.customers.map((c) => (
-                <CommandItem
-                  key={c.id}
-                  value={`customer ${c.firstName} ${c.lastName} ${c.email} ${c.phone}`}
-                  onSelect={() => go(routes.admin.customer(c.id))}
-                >
-                  <Users className="size-4 text-zinc-500" />
-                  <div className="flex min-w-0 flex-1 items-baseline gap-2">
-                    <span className="text-xs font-medium">
-                      {c.firstName} {c.lastName}
-                    </span>
-                    <span className="truncate text-2xs text-zinc-500">
-                      {c.email}
-                    </span>
-                  </div>
-                  <span className="font-mono text-2xs text-zinc-500">
-                    {c.phone}
-                  </span>
-                </CommandItem>
-              ))}
+              {results.customers.map((c) => {
+                // Registered customers (have a Customer row) land in
+                // the "Comptes" tab; guest checkouts in "Invités". The
+                // [id] page is still a placeholder so we route to the
+                // list view where the search input can narrow further.
+                const dest = c.isRegistered
+                  ? routes.admin.customersAccounts
+                  : routes.admin.customersGuests;
+                // React key: phone is the primary identifier, but
+                // phone-less registered accounts use customerId so the
+                // key never collides on empty strings.
+                const rowKey = c.phone || `cust-${c.customerId ?? "?"}`;
+                return (
+                  <CommandItem
+                    key={rowKey}
+                    value={`customer ${c.firstName} ${c.lastName} ${c.email ?? ""} ${c.phone}`}
+                    onSelect={() => go(dest)}
+                  >
+                    <Users className="size-4 text-zinc-500" />
+                    <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                      <span className="text-xs font-medium">
+                        {c.firstName} {c.lastName}
+                      </span>
+                      {c.email ? (
+                        <span className="truncate text-2xs text-zinc-500">
+                          {c.email}
+                        </span>
+                      ) : null}
+                    </div>
+                    {c.phone ? (
+                      <span className="font-mono text-2xs text-zinc-500" dir="ltr">
+                        {c.phone}
+                      </span>
+                    ) : null}
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           ) : null}
         </CommandList>

@@ -88,14 +88,21 @@ export function AlgeriaGeoGrid({ data, selectedCode, onSelect }: Props) {
                         color: revenue / max > 0.5 ? "#ffffff" : "#18181b",
                       }}
                       className={cn(
-                        "flex h-14 w-16 flex-col items-start justify-between rounded-md border p-1.5 text-left text-2xs transition-shadow",
+                        // Auto-width tile — name length dictates the
+                        // width up to a max of 9rem so "Bordj Bou
+                        // Arreridj" (18 chars) doesn't blow up the
+                        // row. Min-w keeps short names like "Adrar"
+                        // from looking lonely.
+                        "flex h-14 min-w-[4.5rem] max-w-[9rem] flex-col items-start justify-between rounded-md border px-2 py-1.5 text-left transition-shadow",
                         isSelected
                           ? "border-zinc-900 shadow-md"
                           : "border-transparent hover:shadow-sm"
                       )}
                     >
-                      <span className="font-mono">{code}</span>
-                      <span className="font-mono tabular-nums">
+                      <span className="line-clamp-2 text-[10px] font-medium leading-tight">
+                        {w?.name ?? code}
+                      </span>
+                      <span className="font-mono text-2xs tabular-nums">
                         {revenue > 0 ? `${Math.round(revenue / 1000)}k` : "—"}
                       </span>
                     </button>

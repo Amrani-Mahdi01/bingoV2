@@ -142,23 +142,23 @@ function CountCard({
   return (
     <Link
       href={href}
-      className="group block rounded-md border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-400"
+      className="group block rounded-md border border-zinc-200 bg-white p-3 transition-colors hover:border-zinc-400 sm:p-4"
     >
       <div className="flex items-center justify-between">
         <span
           className={cn(
-            "inline-flex size-9 items-center justify-center rounded-md",
+            "inline-flex size-8 items-center justify-center rounded-md sm:size-9",
             palette[tone],
           )}
         >
-          <Icon className="size-4" />
+          <Icon className="size-3.5 sm:size-4" />
         </span>
-        <ArrowRight className="size-4 text-zinc-300 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-600" />
+        <ArrowRight className="size-3.5 text-zinc-300 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-600 sm:size-4" />
       </div>
-      <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-zinc-900">
+      <p className="mt-2 font-mono text-lg font-semibold tabular-nums text-zinc-900 sm:mt-3 sm:text-2xl">
         {value === undefined ? "…" : value}
       </p>
-      <Small className="text-zinc-500">{label}</Small>
+      <Small className="text-[11px] text-zinc-500 sm:text-xs">{label}</Small>
     </Link>
   );
 }

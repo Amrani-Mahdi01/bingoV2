@@ -1,18 +1,29 @@
 "use client";
 
 import * as React from "react";
-import { Check, ShoppingCart } from "lucide-react";
+import { useLocalizedRouter } from "@/components/ui/locale-link";
+import { ShoppingCart } from "lucide-react";
 
-import { useCart } from "@/lib/cart";
 import { useLanguage } from "@/lib/i18n";
-import type { Product } from "@/lib/products";
+import { isProductOutOfStock, type Product } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
 /**
- * Add-to-cart pill button for product cards. Click adds the product
- * to the shared cart (via useCart) and stops propagation so the
- * surrounding card link doesn't navigate. Briefly flashes a check on
- * success.
+ * "Ajouter au panier" pill button for product cards.
+ *
+ * Clicks navigate to the product's detail page (`/produit/[slug]`)
+ * instead of pushing straight to the cart — that page is where the
+ * customer picks the color + size variant. Adding to cart from a card
+ * would skip the variant selection and silently land an
+ * un-disambiguated line in their basket. Stops propagation so the
+ * outer card link doesn't also navigate (same URL, but a single
+ * router push is cleaner).
+ *
+ * When the product is out of stock (top-level stock = 0, tracked, no
+ * backorder) the button renders disabled with an "Épuisé" label so
+ * customers can't even land on the detail page to try to add a sold-
+ * out item. Variants override at the detail page so we only block
+ * here when the no-variant rule says so.
  */
 export function AddToCartButton({
   product,
@@ -21,58 +32,41 @@ export function AddToCartButton({
   product?: Product;
   className?: string;
 }) {
-  const { addItem } = useCart();
-  const { t } = useLanguage();
-  const [added, setAdded] = React.useState(false);
-  const timeoutRef = React.useRef<number | null>(null);
+  const router = useLocalizedRouter();
+  const { t, lang } = useLanguage();
+  const outOfStock = product
+    ? isProductOutOfStock(product)
+    : false;
 
   const onClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!product) return;
-    addItem(product, 1);
-    setAdded(true);
-    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-    timeoutRef.current = window.setTimeout(() => setAdded(false), 1500);
+    if (!product || outOfStock) return;
+    router.push(`/produit/${product.slug}`);
   };
-
-  React.useEffect(
-    () => () => {
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-    },
-    []
-  );
 
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={added ? t("card.addedAria") : t("card.addToCart")}
-      aria-pressed={added}
+      disabled={outOfStock}
+      aria-label={outOfStock ? (lang === "ar" ? "نفد المخزون" : "Épuisé") : t("card.addToCart")}
       className={cn(
-        "inline-flex h-7 w-full items-center justify-center gap-2 rounded-2xl px-3 sm:h-9",
+        "inline-flex h-7 w-full items-center justify-center gap-2 rounded-2xl px-3 sm:h-9 sm:flex-1",
         "border border-forest-900 text-forest-900",
         "font-mono text-[10px] font-bold uppercase tracking-[0.2em]",
         "transition-all duration-200",
         "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-forest-900/15",
-        added
-          ? "border-tangerine-500 bg-tangerine-500 text-cream"
+        outOfStock
+          ? "cursor-not-allowed border-wood-300 bg-cream-deep/40 text-wood-500"
           : "bg-cream hover:bg-forest-900 hover:text-cream",
         className
       )}
     >
-      {added ? (
-        <>
-          <Check className="size-3" strokeWidth={2.6} />
-          <span>{t("card.added")}</span>
-        </>
-      ) : (
-        <>
-          <ShoppingCart className="size-3" strokeWidth={2.2} />
-          <span className="sm:hidden">{t("card.addShort")}</span>
-          <span className="hidden sm:inline">{t("card.addToCart")}</span>
-        </>
-      )}
+      <ShoppingCart className="size-3" strokeWidth={2.2} />
+      {outOfStock
+        ? lang === "ar" ? "نفد" : "Épuisé"
+        : t("card.addShort")}
     </button>
   );
 }

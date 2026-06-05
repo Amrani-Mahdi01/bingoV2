@@ -20,6 +20,12 @@ export interface SiteContact {
   /** Postal address, bilingual. Renders verbatim in the contact page. */
   addressFr: string;
   addressAr: string;
+  /** Full Google Maps share URL. Used as the `href` of the address card so
+   *  clicking it opens the location in Maps. Empty string means no link. */
+  mapsUrl: string;
+  /** Short label shown alongside the maps link (e.g. shop name). Bilingual. */
+  mapsPlaceFr: string;
+  mapsPlaceAr: string;
   social: SiteSocial;
 }
 
@@ -28,22 +34,22 @@ export interface SiteSocial {
   instagram: string;
   tiktok: string;
   youtube: string;
-  /** WhatsApp Business profile or click-to-chat URL. */
-  whatsappBusiness: string;
 }
 
 export const siteContact: SiteContact = {
   phone: "+213 36 XX XX XX",
   email: "contact@bingo.dz",
   whatsapp: "+213 6 XX XX XX XX",
-  addressFr: "Cité Hassan Bey, Sétif 19000, Algérie",
-  addressAr: "حي حسن باي، سطيف 19000، الجزائر",
+  addressFr: "Cité Dallas, Bâtiment 3 (près de LG), 19000 Sétif, Algérie",
+  addressAr: "حي دالاس، عمارة 3 (بجوار LG)، 19000 سطيف، الجزائر",
+  mapsUrl: "",
+  mapsPlaceFr: "",
+  mapsPlaceAr: "",
   social: {
     facebook: "https://facebook.com/bingo.dz",
     instagram: "https://instagram.com/bingo.dz",
     tiktok: "",
     youtube: "",
-    whatsappBusiness: "+213 6 XX XX XX XX",
   },
 };
 
@@ -65,6 +71,35 @@ export function mailHref(email: string): string {
 /** Builds the wa.me click-to-chat URL (digits only, no `+` or spaces). */
 export function waHref(whatsapp: string): string {
   return `https://wa.me/${digitsOnly(whatsapp)}`;
+}
+
+/**
+ * Build a Google Maps embed URL (iframe-friendly, no API key required)
+ * from the admin-pasted share link or, failing that, the postal address.
+ *
+ * 1. If the share URL contains an `@lat,lng,zoomz` segment (Google's
+ *    standard format), we extract the coords and build a clean
+ *    `maps.google.com/maps?q=lat,lng&z=zoom&output=embed` URL.
+ * 2. Otherwise fall back to `?q=<address>` so Maps geocodes server-side.
+ * 3. Returns null when both sources are empty.
+ */
+export function toMapsEmbedUrl(
+  mapsUrl: string,
+  fallbackAddress: string,
+): string | null {
+  const url = mapsUrl.trim();
+  // Pattern: @36.1900738,5.4351576,17z   (lat, lng, optional zoom)
+  const m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)(?:,(\d+(?:\.\d+)?)z)?/);
+  if (m) {
+    const [, lat, lng, zoom] = m;
+    const z = zoom ?? "16";
+    return `https://maps.google.com/maps?q=${lat},${lng}&z=${z}&output=embed`;
+  }
+  const addr = fallbackAddress.trim();
+  if (addr) {
+    return `https://maps.google.com/maps?q=${encodeURIComponent(addr)}&output=embed`;
+  }
+  return null;
 }
 
 /* ---------- localStorage cache ----------
@@ -131,15 +166,14 @@ export function siteContactFromSettings(
     whatsapp: pick("contact.whatsapp", siteContact.whatsapp),
     addressFr: pick("contact.address.fr", siteContact.addressFr),
     addressAr: pick("contact.address.ar", siteContact.addressAr),
+    mapsUrl: pick("contact.maps_url", siteContact.mapsUrl),
+    mapsPlaceFr: pick("contact.maps_place.fr", siteContact.mapsPlaceFr),
+    mapsPlaceAr: pick("contact.maps_place.ar", siteContact.mapsPlaceAr),
     social: {
       facebook: pick("social.facebook", siteContact.social.facebook),
       instagram: pick("social.instagram", siteContact.social.instagram),
       tiktok: pick("social.tiktok", siteContact.social.tiktok),
       youtube: pick("social.youtube", siteContact.social.youtube),
-      whatsappBusiness: pick(
-        "social.whatsapp_business",
-        siteContact.social.whatsappBusiness
-      ),
     },
   };
 }

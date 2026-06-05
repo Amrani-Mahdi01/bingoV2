@@ -1,10 +1,14 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { Heart } from "lucide-react";
+import { toast } from "sonner";
 
+import { useLocalizedRouter } from "@/components/ui/locale-link";
+import { useAuth } from "@/lib/auth";
 import { useFavorites } from "@/lib/favorites";
-import { useLanguage } from "@/lib/i18n";
+import { useLanguage, useProductName } from "@/lib/i18n";
 import type { Product } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
@@ -23,14 +27,48 @@ export function ProductActions({
   className?: string;
 }) {
   const { has, toggle } = useFavorites();
-  const { t } = useLanguage();
+  const { customer } = useAuth();
+  const router = useLocalizedRouter();
+  const pathname = usePathname();
+  const { t, lang } = useLanguage();
+  const productName = useProductName();
   const favorited = product ? has(product.slug) : false;
 
   const onFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!product) return;
-    toggle(product.slug);
+    // Favorites are a logged-in-only feature: anonymous users get
+    // bounced to /login with a `next` param so they land back on the
+    // page they were browsing after authenticating.
+    if (!customer) {
+      const next = pathname && pathname.startsWith("/") ? pathname : "/";
+      toast(
+        lang === "ar"
+          ? "سجّل الدخول لحفظ المفضلة"
+          : "Connectez-vous pour enregistrer vos favoris",
+      );
+      router.push(`/login?next=${encodeURIComponent(next)}`);
+      return;
+    }
+    // Toggle BEFORE checking — `favorited` reflects state-as-of-render,
+    // and after toggle() the new state is the opposite.
+    toggle(product);
+    const name = productName(product);
+    const wasFavorited = favorited;
+    if (wasFavorited) {
+      toast(
+        lang === "ar"
+          ? `تم حذف ${name} من المفضلة`
+          : `${name} retiré des favoris`,
+      );
+    } else {
+      toast.success(
+        lang === "ar"
+          ? `تم إضافة ${name} إلى المفضلة`
+          : `${name} ajouté aux favoris`,
+      );
+    }
   };
 
   return (

@@ -158,11 +158,11 @@ export function searchCatalogue(query: string): SearchResults {
 }
 
 export function categoryHref(slug: string) {
-  return `/categorie/${slug}`;
+  return `/catalogue?category=${encodeURIComponent(slug)}`;
 }
 
 export function subCategoryHref(sub: SubCategory) {
-  return `/categorie/${sub.parentSlug}/${sub.slug}`;
+  return `/catalogue?category=${encodeURIComponent(sub.parentSlug)}&sub=${encodeURIComponent(sub.slug)}`;
 }
 
 export function productHref(slug: string) {

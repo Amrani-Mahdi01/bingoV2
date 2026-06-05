@@ -14,13 +14,18 @@ export interface CreateOrderPayload {
     wilayaId: string;
     commune: string;
     address?: string | null;
+    /** "home" (à domicile) or "stopdesk" (retrait en agence). Defaults home. */
+    deliveryType?: "home" | "stopdesk";
     notes?: string | null;
   };
   lines: Array<{
-    productId: number;
+    productSlug: string;
     variant?: string | null;
     quantity: number;
   }>;
+  /** Google reCAPTCHA v2 response token. Required in production; the
+   *  backend skips verification when RECAPTCHA_SECRET_KEY is unset. */
+  recaptchaToken?: string | null;
 }
 
 export interface ApiOrderLine {
@@ -76,6 +81,7 @@ export interface ApiOrder {
     wilayaName: string;
     commune: string;
     address: string | null;
+    deliveryType: "home" | "stopdesk";
     notes: string | null;
   };
   subtotal: number;
@@ -83,6 +89,15 @@ export interface ApiOrder {
   total: number;
   trackingNumber: string | null;
   cancellationReason: string | null;
+  /** ZR Express audit fields — present only on admin responses. */
+  zr?: {
+    parcelId: string | null;
+    state: string | null;
+    syncedAt: string | null;
+    lastError: string | null;
+  };
+  customerIp: string | null;
+  ipBlocked: boolean;
   lines: ApiOrderLine[];
   statusHistory: ApiOrderStatusEntry[];
   callAttempts: ApiOrderCallAttempt[];
@@ -100,6 +115,8 @@ export interface ApiOrderRow {
   wilayaName: string;
   commune: string;
   total: number;
+  customerIp: string | null;
+  ipBlocked: boolean;
   createdAt: string | null;
 }
 
@@ -112,10 +129,14 @@ interface SingleResponse {
 }
 
 export const ordersApi = {
-  /** Public — guest checkout. No auth required. */
+  /** Public — works as guest checkout, but if a customer is logged in
+   *  on the storefront we ship their Sanctum token so the backend can
+   *  attribute the order to their account (powers the Compte/Invité
+   *  filter on /admin/customers). The /api/orders route itself stays
+   *  unauthenticated; auth is optional, validated server-side. */
   create(payload: CreateOrderPayload): Promise<ApiOrder> {
     return http
-      .post<SingleResponse>("/api/orders", payload, { auth: "none" })
+      .post<SingleResponse>("/api/orders", payload, { auth: "customer" })
       .then((r) => r.data);
   },
 
@@ -175,5 +196,15 @@ export const ordersApi = {
     return http
       .get<{ pending: number }>("/api/admin/orders/pending-count", { auth: "admin" })
       .then((r) => r.pending);
+  },
+
+  /** Storefront — full history for the currently authenticated customer.
+   *  Powers /mes-commandes. Returns newest-first. The backend already
+   *  eager-loads lines + statusHistory so the page can render expandable
+   *  cards in a single request. */
+  listMine(): Promise<ApiOrder[]> {
+    return http
+      .get<{ data: ApiOrder[] }>("/api/auth/orders", { auth: "customer" })
+      .then((r) => r.data);
   },
 };

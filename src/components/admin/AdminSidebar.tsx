@@ -8,20 +8,31 @@ import {
   ChevronDown,
   FileText,
   LayoutDashboard,
-  LogOut,
   Package,
   PanelLeft,
   PanelLeftClose,
   Settings,
   ShoppingCart,
+  Truck,
   Users,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAdminMobileNav } from "@/components/admin/AdminMobileNavContext";
 import { usePendingOrders } from "@/lib/hooks/usePendingOrders";
 import { adminNav, routes, type AdminNavSection } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+
+/** First letters of the admin's name → avatar fallback (max 2 chars). */
+export function adminInitials(name?: string | null): string {
+  if (!name) return "AD";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "AD";
+  const first = parts[0]?.[0] ?? "";
+  const second = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + second).toUpperCase().slice(0, 2) || "AD";
+}
 
 const ICONS: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -31,6 +42,7 @@ const ICONS: Record<string, LucideIcon> = {
   BarChart3,
   Settings,
   FileText,
+  Truck,
 };
 
 interface AdminSidebarProps {
@@ -43,17 +55,42 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   // Mount the polling hook here (top of the admin shell) so it runs on
   // every admin page. The hook also writes (N) into document.title.
   const pendingOrders = usePendingOrders();
+  // Mobile drawer state (driven by the topbar hamburger). On md+ the
+  // sidebar is always inline, so this only affects small screens.
+  const { open: mobileOpen, setOpen: setMobileOpen } = useAdminMobileNav();
 
   return (
-    <aside
-      className={cn(
-        "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-zinc-800 bg-zinc-900 text-zinc-100 transition-[width] duration-200 md:flex",
-        collapsed ? "w-16" : "w-64",
-        className
-      )}
-      aria-label="Navigation administration"
-    >
-      {/* Top — wordmark + Admin badge */}
+    <>
+      {/* Backdrop — mobile only, click-to-close. Layered just below
+          the drawer; the drawer itself sits at z-50 so taps on the
+          sidebar's chrome don't dismiss it. */}
+      <div
+        aria-hidden
+        onClick={() => setMobileOpen(false)}
+        className={cn(
+          "fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 md:hidden",
+          mobileOpen
+            ? "opacity-100"
+            : "pointer-events-none opacity-0",
+        )}
+      />
+      <aside
+        className={cn(
+          // Mobile (< md): fixed overlay drawer, hidden off-canvas by
+          // default, slides in when `mobileOpen`. Always w-64 on
+          // mobile because the collapse toggle is desktop-only.
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900 text-zinc-100 transition-transform duration-200",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          // md+: revert to the sticky inline shell, width follows the
+          // collapse state, transforms reset so the mobile state can't
+          // leak across breakpoints.
+          "md:sticky md:top-0 md:translate-x-0 md:transition-[width]",
+          collapsed ? "md:w-16" : "md:w-64",
+          className
+        )}
+        aria-label="Navigation administration"
+      >
+      {/* Top — wordmark + Admin badge + mobile close */}
       <div className="flex h-16 items-center gap-2 border-b border-zinc-800 px-4">
         <Link
           href={routes.admin.dashboard}
@@ -69,6 +106,15 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
             </span>
           )}
         </Link>
+        {/* Close button — drawer only, mobile only. */}
+        <button
+          type="button"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Fermer le menu"
+          className="ms-auto inline-flex size-8 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-50 md:hidden"
+        >
+          <X className="size-4" />
+        </button>
       </div>
 
       {/* Sections */}
@@ -92,12 +138,14 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
 
       {/* Bottom — collapse + user mini-card */}
       <div className="border-t border-zinc-800 p-2">
+        {/* Collapse toggle — desktop only. The mobile drawer is always
+            full-width, so a collapse control would be confusing there. */}
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
           aria-label={collapsed ? "Déplier le menu" : "Replier le menu"}
           aria-expanded={!collapsed}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-50"
+          className="hidden w-full items-center gap-3 rounded-md px-3 py-2 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-50 md:flex"
         >
           {collapsed ? (
             <PanelLeft className="size-4 shrink-0" />
@@ -107,39 +155,9 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
           {collapsed ? null : <span>Replier</span>}
         </button>
 
-        <div
-          className={cn(
-            "mt-2 flex items-center gap-3 rounded-md p-2",
-            collapsed ? "justify-center" : "bg-zinc-800/60"
-          )}
-        >
-          <Avatar className="size-8 shrink-0 border border-zinc-700">
-            <AvatarFallback className="bg-blue-600 text-zinc-50 text-xs">
-              AD
-            </AvatarFallback>
-          </Avatar>
-          {collapsed ? null : (
-            <>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-xs font-medium text-zinc-50">
-                  Admin BINGO
-                </span>
-                <span className="truncate text-2xs text-zinc-400">
-                  admin@bingo.dz
-                </span>
-              </div>
-              <button
-                type="button"
-                aria-label="Déconnexion"
-                className="inline-flex size-7 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-50"
-              >
-                <LogOut className="size-3.5" />
-              </button>
-            </>
-          )}
-        </div>
       </div>
     </aside>
+    </>
   );
 }
 

@@ -20,7 +20,7 @@ export function AdminPageHeader({
   return (
     <header
       className={cn(
-        "mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 pb-5",
+        "mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 pb-4 sm:mb-6 sm:pb-5",
         className
       )}
     >
@@ -30,11 +30,13 @@ export function AdminPageHeader({
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="mt-1.5 text-[1.375rem] font-semibold leading-tight tracking-tight text-zinc-900">
+        <h1 className="mt-1 text-lg font-semibold leading-tight tracking-tight text-zinc-900 sm:mt-1.5 sm:text-[1.375rem]">
           {title}
         </h1>
         {subtitle ? (
-          <div className="mt-1.5 text-sm text-zinc-500">{subtitle}</div>
+          <div className="mt-1 text-xs text-zinc-500 sm:mt-1.5 sm:text-sm">
+            {subtitle}
+          </div>
         ) : null}
       </div>
       {actions ? (

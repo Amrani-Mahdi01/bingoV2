@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
+import { useLocalizedRouter } from "@/components/ui/locale-link";
+import ReCAPTCHA from "react-google-recaptcha";
 import {
   ArrowRight,
   Lock,
@@ -28,6 +29,10 @@ import {
 } from "@/app/login/page";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Same env var the checkout page reads — empty in local dev means
+// "no captcha required" and the widget is not rendered. Production
+// must populate it (and RECAPTCHA_SECRET_KEY on the backend).
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? "";
 
 type Errors = Partial<
   Record<
@@ -37,6 +42,7 @@ type Errors = Partial<
     | "password"
     | "confirm"
     | "terms"
+    | "recaptcha"
     | "form",
     string
   >
@@ -45,7 +51,7 @@ type Errors = Partial<
 export default function RegisterPage() {
   const { t, lang } = useLanguage();
   const { register } = useAuth();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -55,6 +61,10 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [errors, setErrors] = React.useState<Errors>({});
   const [submitting, setSubmitting] = React.useState(false);
+  const [recaptchaToken, setRecaptchaToken] = React.useState<string | null>(
+    null,
+  );
+  const recaptchaRef = React.useRef<ReCAPTCHA | null>(null);
 
   const clearError = (k: keyof Errors) =>
     setErrors((p) => {
@@ -71,10 +81,15 @@ export default function RegisterPage() {
     if (!email.trim()) e.email = t("register.error.emailMissing");
     else if (!EMAIL_RE.test(email.trim())) e.email = t("register.error.emailInvalid");
     if (!password) e.password = t("register.error.passwordMissing");
-    else if (password.length < 6) e.password = t("register.error.passwordShort");
+    else if (password.length < 8) e.password = t("register.error.passwordShort");
     if (!confirm) e.confirm = t("register.error.confirmMissing");
     else if (confirm !== password) e.confirm = t("register.error.confirmMismatch");
     if (!acceptedTerms) e.terms = t("register.error.terms");
+    // Only enforce the captcha when a site key is configured; in local
+    // dev the widget isn't rendered at all, so the field must pass.
+    if (RECAPTCHA_SITE_KEY && !recaptchaToken) {
+      e.recaptcha = t("checkout.error.recaptcha");
+    }
     return e;
   };
 
@@ -101,15 +116,21 @@ export default function RegisterPage() {
         lastName: lastName.trim(),
         email: email.trim(),
         password,
+        recaptchaToken: recaptchaToken ?? undefined,
       });
       router.push("/");
     } catch (err) {
+      // Reset the captcha after any backend failure so the user can
+      // solve a fresh challenge — Google tokens are single-use.
+      recaptchaRef.current?.reset();
+      setRecaptchaToken(null);
       if (err instanceof ApiError) {
         const fieldErrors: Errors = {};
         if (err.errors?.first_name?.[0]) fieldErrors.firstName = err.errors.first_name[0];
         if (err.errors?.last_name?.[0]) fieldErrors.lastName = err.errors.last_name[0];
         if (err.errors?.email?.[0]) fieldErrors.email = err.errors.email[0];
         if (err.errors?.password?.[0]) fieldErrors.password = err.errors.password[0];
+        if (err.errors?.recaptcha?.[0]) fieldErrors.recaptcha = err.errors.recaptcha[0];
         if (Object.keys(fieldErrors).length === 0) fieldErrors.form = err.message;
         setErrors(fieldErrors);
       } else {
@@ -175,6 +196,7 @@ export default function RegisterPage() {
                   setFirstName(e.target.value);
                   clearError("firstName");
                 }}
+                placeholder={t("register.firstNamePlaceholder")}
                 icon={<User className="size-4" strokeWidth={2} />}
                 invalid={!!errors.firstName}
               />
@@ -194,6 +216,7 @@ export default function RegisterPage() {
                   setLastName(e.target.value);
                   clearError("lastName");
                 }}
+                placeholder={t("register.lastNamePlaceholder")}
                 invalid={!!errors.lastName}
               />
             </Field>
@@ -299,6 +322,35 @@ export default function RegisterPage() {
               </p>
             ) : null}
           </div>
+
+          {/* Anti-bot — same widget as /commander. Only rendered when
+              the public site key is configured; local dev with an empty
+              env skips it entirely and the form lets you through. */}
+          {RECAPTCHA_SITE_KEY ? (
+            <div className="mt-1">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-wood-600">
+                {t("checkout.recaptcha.title")}
+              </p>
+              <div className="mt-3 flex justify-start">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={RECAPTCHA_SITE_KEY}
+                  hl={lang === "ar" ? "ar" : "fr"}
+                  onChange={(token) => {
+                    setRecaptchaToken(token);
+                    if (token) clearError("recaptcha");
+                  }}
+                  onExpired={() => setRecaptchaToken(null)}
+                  onErrored={() => setRecaptchaToken(null)}
+                />
+              </div>
+              {errors.recaptcha ? (
+                <p className="mt-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-red-700">
+                  {errors.recaptcha}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           {errors.form ? (
             <p

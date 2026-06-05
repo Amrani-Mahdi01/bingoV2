@@ -7,60 +7,27 @@ import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
 import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
-import { PRODUCTS } from "@/lib/products";
+import { PRODUCTS, type Product } from "@/lib/products";
+import { useSiteHome } from "@/lib/site-home-context";
+import type { HeroSlot } from "@/lib/site-home";
 import { cn } from "@/lib/utils";
 
-const discountPercent = (price: number, oldPrice?: number) =>
+const discountPercent = (price: number, oldPrice?: number | null) =>
   oldPrice && oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : null;
 
 /**
- * Nouveautés — newest arrivals section.
+ * Nouveautés — newest arrivals section. Cards are populated from
+ * /api/products?flag=new with a most-recently-created fallback when
+ * no product is explicitly flagged as new. Hides itself when the
+ * catalogue has nothing to show.
+ *
  * Decoration: a flock of pigeons crosses the whole section width on
  * staggered timings. No mountains.
  */
-
-const NEWEST: Array<{
-  slug: string;
-  name: string;
-  brand: string;
-  price: number;
-  oldPrice?: number;
-  image: string;
-}> = [
-  {
-    slug: "patagonia-torrentshell",
-    name: "Veste imperméable",
-    brand: "Patagonia Torrentshell",
-    price: 16900,
-    oldPrice: 19500,
-    image: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "jetboil-flash",
-    name: "Réchaud à gaz",
-    brand: "Jetboil Flash",
-    price: 11200,
-    image: "https://images.unsplash.com/photo-1517824806704-9040b037703b?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "leatherman-wave",
-    name: "Couteau multifonctions",
-    brand: "Leatherman Wave+",
-    price: 8400,
-    oldPrice: 9900,
-    image: "https://images.unsplash.com/photo-1502136969935-8d8eef54d77b?w=800&q=80&fit=crop",
-  },
-  {
-    slug: "hydro-flask-1l",
-    name: "Bouteille isotherme 1 L",
-    brand: "Hydro Flask Wide",
-    price: 4200,
-    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&q=80&fit=crop",
-  },
-];
-
 export function Newest() {
   const { t } = useLanguage();
+  const { newest } = useSiteHome();
+  if (newest.length === 0) return null;
   return (
     <section
       aria-labelledby="newest-title"
@@ -146,9 +113,9 @@ export function Newest() {
         </header>
 
         <ul className="relative z-10 mt-10 grid grid-cols-2 gap-3 sm:gap-4 md:mt-12 md:grid-cols-4 md:gap-5">
-          {NEWEST.map((p) => (
+          {newest.map((p) => (
             <li key={p.slug}>
-              <ProductCard {...p} />
+              <ProductCard product={p} />
             </li>
           ))}
         </ul>
@@ -158,9 +125,22 @@ export function Newest() {
 }
 
 /* ───── Product card — dark theme variant ───── */
-function ProductCard({
+function ProductCard({ product }: { product: HeroSlot }) {
+  const slug = product.slug;
+  const name = product.nameFr;
+  const brand = product.brand ?? "";
+  const price = product.price ?? 0;
+  const oldPrice = product.oldPrice ?? undefined;
+  const image = product.image;
+  return <ProductCardInner {...{ slug, name, brand, price, oldPrice, image, nameAr: product.nameAr }} />;
+}
+
+/** Inner card kept on the original prop shape so the existing JSX
+ *  body (~120 lines below) doesn't need to be rewritten. */
+function ProductCardInner({
   slug,
   name,
+  nameAr,
   brand,
   price,
   oldPrice,
@@ -168,6 +148,7 @@ function ProductCard({
 }: {
   slug: string;
   name: string;
+  nameAr?: string;
   brand: string;
   price: number;
   oldPrice?: number;
@@ -177,8 +158,27 @@ function ProductCard({
   const formatPrice = useFormatPrice();
   const productName = useProductName();
   const pct = discountPercent(price, oldPrice);
-  const fullProduct = PRODUCTS.find((p) => p.slug === slug);
-  const displayName = productName({ name, nameAr: fullProduct?.nameAr });
+  // The cart + favorites contexts expect the legacy local `Product`
+  // shape. Use the local mock when the slug matches, otherwise build
+  // a synthetic Product from the backend row so heart + add-to-cart
+  // work for every card regardless of where the data came from.
+  const fullProduct: Product = React.useMemo(() => {
+    const legacy = PRODUCTS.find((p) => p.slug === slug);
+    if (legacy) return legacy;
+    return {
+      slug,
+      name,
+      nameAr: nameAr ?? undefined,
+      brand,
+      price,
+      oldPrice,
+      image,
+      categorySlug: undefined,
+      description: "",
+      features: [],
+    };
+  }, [slug, name, nameAr, brand, price, oldPrice, image]);
+  const displayName = productName({ name, nameAr });
   return (
     <TentLink
       href={`/produit/${slug}`}
@@ -237,8 +237,8 @@ function ProductCard({
           ) : null}
         </div>
 
-        <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
-          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-tangerine-500 bg-tangerine-500 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-400 hover:text-forest-900 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
+        <div className="mt-auto flex flex-col gap-2 pt-3 sm:flex-row sm:pt-4">
+          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-tangerine-500 bg-tangerine-500 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-400 hover:text-forest-900 sm:h-9 sm:flex-1 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
             {t("card.order")}
           </span>

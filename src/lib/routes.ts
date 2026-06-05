@@ -11,7 +11,7 @@ export const routes = {
   home: "/",
   catalog: "/catalog",
   category: (slug: string) => `/catalog/${slug}` as const,
-  product: (slug: string) => `/product/${slug}` as const,
+  product: (slug: string) => `/produit/${slug}` as const,
   compare: "/compare",
   cart: "/cart",
   checkout: "/checkout",
@@ -22,10 +22,11 @@ export const routes = {
   login: "/login",
   register: "/register",
 
-  // Account
+  // Account — French slugs match the rest of the storefront
+  // (/favoris, /commander, /panier, …).
   account: {
-    orders: "/account/orders",
-    order: (id: string) => `/account/orders/${id}` as const,
+    orders: "/mes-commandes",
+    order: (id: string) => `/mes-commandes/${id}` as const,
     /** @deprecated favorites now live at top-level (guest-friendly). Use `routes.favorites`. */
     favorites: "/favorites",
     addresses: "/account/addresses",
@@ -53,10 +54,16 @@ export const routes = {
     order: (id: string) => `/admin/orders/${id}` as const,
     customers: "/admin/customers",
     customer: (id: string) => `/admin/customers/${id}` as const,
+    customersGuests: "/admin/customers/guests",
+    customersAccounts: "/admin/customers/accounts",
+    admins: "/admin/customers/admins",
+    contactMessages: "/admin/customers/messages",
+    blockedIps: "/admin/blocked-ips",
     statistics: "/admin/statistics",
     settings: "/admin/settings",
     banners: "/admin/banners",
     shipping: "/admin/shipping",
+    zr: "/admin/zr-express",
     contacts: "/admin/contacts",
     pages: {
       delivery: "/admin/pages/delivery",
@@ -156,8 +163,15 @@ export const adminNav: AdminNavSection[] = [
   },
   {
     label: "Clients",
-    href: routes.admin.customers,
+    href: routes.admin.customersAccounts,
     icon: "Users",
+    children: [
+      { label: "Comptes", href: routes.admin.customersAccounts },
+      { label: "Invités", href: routes.admin.customersGuests },
+      { label: "Admins", href: routes.admin.admins },
+      { label: "Messages", href: routes.admin.contactMessages },
+      { label: "Liste noire", href: routes.admin.blockedIps },
+    ],
   },
   {
     label: "Statistiques",
@@ -165,16 +179,24 @@ export const adminNav: AdminNavSection[] = [
     icon: "BarChart3",
   },
   {
-    label: "Pages du site",
-    href: routes.admin.pages.delivery,
-    icon: "FileText",
-    children: [
-      { label: "Livraison", href: routes.admin.pages.delivery },
-      { label: "Retours", href: routes.admin.pages.returns },
-      { label: "CGV", href: routes.admin.pages.cgv },
-      { label: "À propos", href: routes.admin.pages.about },
-    ],
+    label: "ZR Express",
+    href: routes.admin.zr,
+    icon: "Truck",
   },
+  // "Pages du site" hidden for now — pages are managed through the
+  // storefront translation files; re-enable when the admin CMS for
+  // editorial pages is wired up.
+  // {
+  //   label: "Pages du site",
+  //   href: routes.admin.pages.delivery,
+  //   icon: "FileText",
+  //   children: [
+  //     { label: "Livraison", href: routes.admin.pages.delivery },
+  //     { label: "Retours", href: routes.admin.pages.returns },
+  //     { label: "CGV", href: routes.admin.pages.cgv },
+  //     { label: "À propos", href: routes.admin.pages.about },
+  //   ],
+  // },
   {
     label: "Configuration",
     href: routes.admin.settings,

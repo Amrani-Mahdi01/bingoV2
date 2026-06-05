@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { LocaleLink as Link } from "@/components/ui/locale-link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Check,
   ChevronDown,
@@ -17,14 +17,33 @@ import {
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductActions } from "@/components/product/product-actions";
 import { TentLink } from "@/components/ui/tent-link";
-import { CATEGORIES } from "@/lib/catalogue";
+import { productsApi, type ApiProduct } from "@/lib/api/products";
 import { useFormatPrice, useLanguage, useProductName } from "@/lib/i18n";
-import {
-  discountPercent,
-  PRODUCTS,
-  type Product,
-} from "@/lib/products";
+import { PRODUCTS, discountPercent, type Product } from "@/lib/products";
+import { useSiteCategories } from "@/lib/site-categories-context";
 import { cn } from "@/lib/utils";
+
+/** Flattened product row the catalogue page works with. Built on mount
+ *  from /api/products?perPage=100 — keeps every filter/sort instant
+ *  without per-keystroke API calls. */
+interface CatalogueProduct {
+  slug: string;
+  nameFr: string;
+  nameAr: string | null;
+  brand: string;
+  brandSlug: string | null;
+  price: number;
+  oldPrice: number | null;
+  image: string;
+  /** Leaf category slug (could be a sub-category or a top-level cat with no children). */
+  categorySlug: string | null;
+  /** Resolved parent (top-level) category slug for filtering "all under X". */
+  parentCategorySlug: string | null;
+  isPromo: boolean;
+  stock: number;
+  trackStock: boolean;
+  allowBackorder: boolean;
+}
 
 const SORTS = [
   { value: "popular",    labelKey: "sort.popular" },
@@ -42,12 +61,41 @@ const PRICE_STEP = 500;
 
 const PAGE_SIZE = 9;
 
-/** Best-effort manufacturer extraction from `product.brand`.
- *  "Marmot Lithium 0" → "Marmot", "Hydro Flask Wide" → "Hydro Flask". */
-function manufacturerOf(p: Product): string {
-  const parts = p.brand.split(/\s+/);
-  if (parts[0] === "Hydro" && parts[1] === "Flask") return "Hydro Flask";
-  return parts[0];
+/** Shallow equality for two Sets of strings — used to detect whether
+ *  the catalogue's draft filter values differ from the applied ones. */
+function setEquals(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const v of a) if (!b.has(v)) return false;
+  return true;
+}
+
+/** Convert the backend ApiProduct shape into the lighter CatalogueProduct
+ *  the page works with. `parentBySlug` lets us resolve a leaf category
+ *  to its top-level parent (so "Tentes & abris" filter shows products
+ *  filed under any sub like "Tentes 2-3 places"). */
+function adaptApiProduct(
+  p: ApiProduct,
+  parentBySlug: Map<string, string>,
+): CatalogueProduct {
+  const catSlug = p.category?.slug ?? null;
+  const primary =
+    p.images?.find((img) => img.isPrimary)?.url ?? p.images?.[0]?.url ?? "";
+  return {
+    slug: p.slug,
+    nameFr: p.nameFr,
+    nameAr: p.nameAr ?? null,
+    brand: p.brand?.name ?? "—",
+    brandSlug: p.brand?.slug ?? null,
+    price: p.price,
+    oldPrice: p.oldPrice ?? null,
+    image: primary,
+    categorySlug: catSlug,
+    parentCategorySlug: catSlug ? parentBySlug.get(catSlug) ?? catSlug : null,
+    isPromo: !!p.isPromo,
+    stock: p.stock ?? 0,
+    trackStock: !!p.trackStock,
+    allowBackorder: !!p.allowBackorder,
+  };
 }
 
 export default function CataloguePage() {
@@ -66,9 +114,15 @@ function readSort(raw: string | null): SortValue | null {
 }
 
 function CatalogueContent() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const formatPrice = useFormatPrice();
+  const productName = useProductName();
+  // Top-level categories with children, fetched once at layout SSR.
+  const { list: categoriesList } = useSiteCategories();
+
   // Read filter intent from the URL (e.g. ?promo=1 from the
   // header "Promotions" link, ?category=tentes from a category tile,
   // ?sort=popular from the best-sellers "Voir le classement" CTA).
@@ -76,19 +130,71 @@ function CatalogueContent() {
     searchParams.get("promo") === "1" ||
     searchParams.get("promo") === "true";
   const initialCategory = searchParams.get("category");
+  const initialSub = searchParams.get("sub");
   const initialSort = readSort(searchParams.get("sort"));
 
+  // A `?sub=` value is only honored if it actually belongs to the
+  // `?category=` parent — otherwise we silently drop it.
+  // Sub-categories aren't included in the SiteCategoriesProvider top-level
+  // list, so we walk each top-level's `children` (loaded as nested on the
+  // categories tree) — see hookups further down where we hydrate them.
+  const findTopBySlug = React.useCallback(
+    (slug: string | null) =>
+      slug ? categoriesList.find((c) => c.slug === slug) ?? null : null,
+    [categoriesList],
+  );
+  const initialCategoryObj = findTopBySlug(initialCategory);
+
   const [activeCategory, setActiveCategory] = React.useState<string | null>(
-    initialCategory && CATEGORIES.some((c) => c.slug === initialCategory)
-      ? initialCategory
-      : null
+    initialCategoryObj ? initialCategoryObj.slug : null,
   );
   const [activeSubCategory, setActiveSubCategory] = React.useState<
     string | null
-  >(null);
+  >(initialSub ?? null);
   const [expandedCategories, setExpandedCategories] = React.useState<
     Set<string>
-  >(() => new Set());
+  >(() =>
+    initialSub && initialCategoryObj
+      ? new Set([initialCategoryObj.slug])
+      : new Set(),
+  );
+
+  // Whole catalogue loaded once. Filters and sort run client-side on
+  // this list — instant UX, single API request per page load.
+  const [allProducts, setAllProducts] = React.useState<CatalogueProduct[] | null>(
+    null,
+  );
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const ctrl = new AbortController();
+    productsApi
+      .listPublic({ perPage: 100, signal: ctrl.signal })
+      .then((res) => {
+        // Build leaf-slug → top-level-slug map so a product filed under
+        // a sub-category still matches its parent in the sidebar filter.
+        const parentBySlug = new Map<string, string>();
+        for (const top of categoriesList) {
+          parentBySlug.set(top.slug, top.slug);
+          for (const sub of top.children ?? []) {
+            parentBySlug.set(sub.slug, top.slug);
+          }
+        }
+        const list: CatalogueProduct[] = res.data.map((p) =>
+          adaptApiProduct(p, parentBySlug),
+        );
+        setAllProducts(list);
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        if ((err as Error)?.name === "AbortError") return;
+        setAllProducts([]);
+        setLoadError(
+          (err as Error)?.message ?? "Impossible de charger le catalogue.",
+        );
+      });
+    return () => ctrl.abort();
+  }, [categoriesList]);
   const [sort, setSort] = React.useState<SortValue>(initialSort ?? "popular");
   const [promosOnly, setPromosOnly] = React.useState(initialPromosOnly);
   const [inStockOnly, setInStockOnly] = React.useState(false);
@@ -104,12 +210,51 @@ function CatalogueContent() {
   const [page, setPage] = React.useState(1);
   const gridTopRef = React.useRef<HTMLDivElement>(null);
 
-  // Unique manufacturers across the catalogue, sorted.
+  /* ─── Draft layer (price + brands only) ──────────────────────────
+     These two filter dimensions are batched behind an Apply button
+     because they're the ones the merchant typically tweaks several
+     times before committing (slide the price, tick a few brand boxes).
+     Categories, sub-categories, stock, and promo all stay LIVE — they
+     each represent a single decisive choice. */
+  const [draftSelectedBrands, setDraftSelectedBrands] = React.useState<
+    Set<string>
+  >(() => new Set(selectedBrands));
+  const [draftPriceMin, setDraftPriceMin] = React.useState(priceMin);
+  const [draftPriceMax, setDraftPriceMax] = React.useState(priceMax);
+
+  /** True when the draft differs from the applied state — Apply button
+   *  enables itself, Cancel button becomes meaningful. */
+  const draftDirty =
+    draftPriceMin !== priceMin ||
+    draftPriceMax !== priceMax ||
+    !setEquals(draftSelectedBrands, selectedBrands);
+
+  /** Apply the draft → triggers the URL sync + grid re-filter via the
+   *  existing applied state. Also closes the mobile drawer so the user
+   *  sees the new grid right away on phones. */
+  const applyDraft = React.useCallback(() => {
+    setSelectedBrands(new Set(draftSelectedBrands));
+    setPriceMin(draftPriceMin);
+    setPriceMax(draftPriceMax);
+    setMobileFiltersOpen(false);
+  }, [draftSelectedBrands, draftPriceMin, draftPriceMax]);
+
+  /** Restore the draft to the currently-applied values — i.e. discard
+   *  pending price / brand edits. */
+  const cancelDraft = React.useCallback(() => {
+    setDraftSelectedBrands(new Set(selectedBrands));
+    setDraftPriceMin(priceMin);
+    setDraftPriceMax(priceMax);
+  }, [selectedBrands, priceMin, priceMax]);
+
+  // Unique brand names across the loaded catalogue, sorted.
   const allBrands = React.useMemo(() => {
     const set = new Set<string>();
-    PRODUCTS.forEach((p) => set.add(manufacturerOf(p)));
+    (allProducts ?? []).forEach((p) => {
+      if (p.brand && p.brand !== "—") set.add(p.brand);
+    });
     return [...set].sort((a, b) => a.localeCompare(b, "fr"));
-  }, []);
+  }, [allProducts]);
 
   const filteredBrands = React.useMemo(() => {
     const q = brandsQuery.trim().toLowerCase();
@@ -124,7 +269,7 @@ function CatalogueContent() {
   const hiddenBrandsCount = filteredBrands.length - visibleBrandsList.length;
 
   const toggleBrand = (b: string) => {
-    setSelectedBrands((prev) => {
+    setDraftSelectedBrands((prev) => {
       const next = new Set(prev);
       if (next.has(b)) next.delete(b);
       else next.add(b);
@@ -133,26 +278,42 @@ function CatalogueContent() {
   };
 
   const visible = React.useMemo(() => {
-    let list = PRODUCTS.slice();
+    let list = (allProducts ?? []).slice();
 
     if (activeCategory) {
-      list = list.filter((p) => p.categorySlug === activeCategory);
+      // Match products whose top-level (resolved) category is the one
+      // picked in the sidebar — works for both direct top-level
+      // attachments and products filed under a sub.
+      list = list.filter((p) => p.parentCategorySlug === activeCategory);
+    }
+    if (activeSubCategory) {
+      // Narrow to the leaf sub-category. Products attached directly to
+      // the parent (not any sub) drop out — same intent as before.
+      list = list.filter((p) => p.categorySlug === activeSubCategory);
     }
     if (selectedBrands.size > 0) {
-      list = list.filter((p) => selectedBrands.has(manufacturerOf(p)));
+      list = list.filter((p) => selectedBrands.has(p.brand));
     }
     list = list.filter((p) => p.price >= priceMin && p.price <= priceMax);
     if (promosOnly) {
-      list = list.filter((p) => p.oldPrice && p.oldPrice > p.price);
+      list = list.filter(
+        (p) => p.isPromo || (p.oldPrice != null && p.oldPrice > p.price),
+      );
     }
-    // `inStockOnly` has no backing data yet — all products are
-    // considered in stock; the toggle is honored as a no-op for now.
+    if (inStockOnly) {
+      // Available if stock-tracking is off, OR backorder is allowed,
+      // OR stock > 0 — mirrors the public products endpoint.
+      list = list.filter(
+        (p) => !p.trackStock || p.allowBackorder || p.stock > 0,
+      );
+    }
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter(
         (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q)
+          p.nameFr.toLowerCase().includes(q) ||
+          (p.nameAr ?? "").includes(query.trim()) ||
+          p.brand.toLowerCase().includes(q),
       );
     }
     switch (sort) {
@@ -162,11 +323,13 @@ function CatalogueContent() {
       case "price-desc":
         list.sort((a, b) => b.price - a.price);
         break;
-      // "popular" / "newest" — no real metric yet, keep source order
+      // "popular" / "newest" — no client-side metric; keep source order
     }
     return list;
   }, [
+    allProducts,
     activeCategory,
+    activeSubCategory,
     sort,
     promosOnly,
     inStockOnly,
@@ -177,6 +340,7 @@ function CatalogueContent() {
   ]);
 
   const resetFilters = () => {
+    // Applied state — drives the grid / URL.
     setActiveCategory(null);
     setActiveSubCategory(null);
     setExpandedCategories(new Set());
@@ -188,6 +352,12 @@ function CatalogueContent() {
     setSelectedBrands(new Set());
     setBrandsQuery("");
     setShowAllBrands(false);
+    // Draft state for batched filters (price + brands) — keep the
+    // sidebar in sync so the Apply button doesn't go "dirty" right
+    // after a reset.
+    setDraftPriceMin(PRICE_MIN);
+    setDraftPriceMax(PRICE_MAX);
+    setDraftSelectedBrands(new Set());
   };
 
   const toggleCategoryExpansion = (slug: string) => {
@@ -201,6 +371,7 @@ function CatalogueContent() {
 
   const hasFilters =
     activeCategory !== null ||
+    activeSubCategory !== null ||
     promosOnly ||
     inStockOnly ||
     query.trim() !== "" ||
@@ -209,7 +380,12 @@ function CatalogueContent() {
     selectedBrands.size > 0;
 
   const selectedCategory = activeCategory
-    ? CATEGORIES.find((c) => c.slug === activeCategory)
+    ? categoriesList.find((c) => c.slug === activeCategory) ?? null
+    : null;
+  const selectedCategoryLabel = selectedCategory
+    ? lang === "ar" && selectedCategory.nameAr
+      ? selectedCategory.nameAr
+      : selectedCategory.nameFr
     : null;
 
   // If the URL search params change after mount (user clicks the
@@ -219,20 +395,143 @@ function CatalogueContent() {
   React.useEffect(() => {
     const p = searchParams.get("promo");
     setPromosOnly(p === "1" || p === "true");
+
+    const stock = searchParams.get("stock");
+    setInStockOnly(stock === "1" || stock === "true");
+
     const c = searchParams.get("category");
-    if (c && CATEGORIES.some((cat) => cat.slug === c)) {
-      setActiveCategory(c);
+    const sub = searchParams.get("sub");
+    const cat = c ? categoriesList.find((cc) => cc.slug === c) ?? null : null;
+    if (cat) {
+      setActiveCategory(cat.slug);
+      const subOk =
+        sub && (cat.children ?? []).some((sc) => sc.slug === sub) ? sub : null;
+      setActiveSubCategory(subOk);
+      if (subOk) {
+        setExpandedCategories((prev) => {
+          if (prev.has(cat.slug)) return prev;
+          const next = new Set(prev);
+          next.add(cat.slug);
+          return next;
+        });
+      }
+    } else if (!c) {
+      // No category param in URL → clear any stale state (handles the
+      // case where the user nukes the filter via the breadcrumb).
+      setActiveCategory(null);
       setActiveSubCategory(null);
     }
     const s = readSort(searchParams.get("sort"));
     if (s) setSort(s);
-  }, [searchParams]);
+    const q = searchParams.get("q") ?? "";
+    setQuery(q);
+
+    const minRaw = Number(searchParams.get("min"));
+    const maxRaw = Number(searchParams.get("max"));
+    const nextMin =
+      Number.isFinite(minRaw) && minRaw >= PRICE_MIN ? minRaw : PRICE_MIN;
+    const nextMax =
+      Number.isFinite(maxRaw) && maxRaw <= PRICE_MAX && maxRaw > 0
+        ? maxRaw
+        : PRICE_MAX;
+    setPriceMin(nextMin);
+    setPriceMax(nextMax);
+    setDraftPriceMin(nextMin);
+    setDraftPriceMax(nextMax);
+
+    const brandsRaw = searchParams.get("brands");
+    const nextBrands = brandsRaw
+      ? new Set(brandsRaw.split(",").filter(Boolean))
+      : new Set<string>();
+    setSelectedBrands(nextBrands);
+    setDraftSelectedBrands(new Set(nextBrands));
+
+    // Page hydration. Stamp `prevFiltersRef` with the signature we're
+    // about to apply so the page-reset effect below sees no diff and
+    // leaves `?page=` alone.
+    const nextCategory = cat ? cat.slug : !c ? null : activeCategory;
+    const nextSub =
+      cat && sub && (cat.children ?? []).some((sc) => sc.slug === sub)
+        ? sub
+        : !c
+        ? null
+        : activeSubCategory;
+    const nextSort = s ?? sort;
+    const nextPromo = p === "1" || p === "true";
+    const nextStock = stock === "1" || stock === "true";
+    const nextSignature =
+      `${nextCategory ?? ""}|${nextSub ?? ""}|${nextSort}|` +
+      `${nextPromo ? 1 : 0}|${nextStock ? 1 : 0}|${q.trim()}|` +
+      `${nextMin}|${nextMax}|${[...nextBrands].sort().join(",")}`;
+    prevFiltersRef.current = nextSignature;
+
+    const pageRaw = Number(searchParams.get("page"));
+    const nextPage =
+      Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+    setPage(nextPage);
+  }, [searchParams, categoriesList]);
 
   // Reset to page 1 whenever the filter set changes so the user doesn't
-  // land on an empty page after narrowing the results.
+  // land on an empty page after narrowing the results — but only on
+  // *real* filter edits, not on the URL→state hydration that fires on
+  // mount and on back/forward nav (which carries its own `?page=`).
+  //
+  // The URL→state effect below stamps the next signature into
+  // `prevFiltersRef` BEFORE calling setX, so by the time this effect
+  // runs the signature already matches and we correctly bail out,
+  // preserving the URL-supplied page.
+  const filtersSignature =
+    `${activeCategory ?? ""}|${activeSubCategory ?? ""}|${sort}|` +
+    `${promosOnly ? 1 : 0}|${inStockOnly ? 1 : 0}|${query.trim()}|` +
+    `${priceMin}|${priceMax}|${[...selectedBrands].sort().join(",")}`;
+  const prevFiltersRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    setPage(1);
+    if (
+      prevFiltersRef.current !== null &&
+      prevFiltersRef.current !== filtersSignature
+    ) {
+      setPage(1);
+    }
+    prevFiltersRef.current = filtersSignature;
+  }, [filtersSignature]);
+
+  /* ─── URL ⇄ state sync ────────────────────────────────────────────
+     Mirror the current filter state into the address bar so the page
+     is bookmarkable / shareable. Uses router.replace (not push) so the
+     back button doesn't fill with intermediate filter clicks. Skips
+     the first render so we don't clobber the URL during hydration.
+     The hydration is the OTHER direction (URL → state); see the
+     `searchParams` effect above. */
+  const hasSyncedOnceRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!hasSyncedOnceRef.current) {
+      hasSyncedOnceRef.current = true;
+      return;
+    }
+    const params = new URLSearchParams();
+    if (activeCategory) params.set("category", activeCategory);
+    if (activeSubCategory) params.set("sub", activeSubCategory);
+    if (sort && sort !== "popular") params.set("sort", sort);
+    if (promosOnly) params.set("promo", "1");
+    if (inStockOnly) params.set("stock", "1");
+    const qTrim = query.trim();
+    if (qTrim) params.set("q", qTrim);
+    if (priceMin !== PRICE_MIN) params.set("min", String(priceMin));
+    if (priceMax !== PRICE_MAX) params.set("max", String(priceMax));
+    if (selectedBrands.size > 0) {
+      params.set("brands", [...selectedBrands].sort().join(","));
+    }
+    if (page > 1) params.set("page", String(page));
+    const qs = params.toString();
+    const next = qs ? `${pathname}?${qs}` : pathname;
+    // Only push when the URL would actually change — avoids triggering
+    // the inverse `searchParams` effect on every render.
+    if (next !== `${pathname}${window.location.search}`) {
+      router.replace(next, { scroll: false });
+    }
   }, [
+    pathname,
+    router,
     activeCategory,
     activeSubCategory,
     sort,
@@ -242,6 +541,7 @@ function CatalogueContent() {
     priceMin,
     priceMax,
     selectedBrands,
+    page,
   ]);
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
@@ -260,25 +560,36 @@ function CatalogueContent() {
 
   const filtersNode = (
     <div className="overflow-hidden rounded-2xl border border-wood-300/60 bg-cream-deep/30">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3">
+      {/* Header — title only. Apply/Cancel + Clear buttons live in the
+          action bar right below so they're the first thing the merchant
+          sees and never has to scroll past the filter sections. */}
+      <div className="px-4 py-3">
         <p className="font-display text-sm font-bold tracking-[-0.01em] text-forest-900">
           {t("filters.title")}
         </p>
-        <button
-          type="button"
-          onClick={resetFilters}
-          disabled={!hasFilters}
-          className={cn(
-            "font-mono text-[10px] uppercase tracking-[0.22em] transition-colors",
-            hasFilters
-              ? "text-tangerine-700 hover:text-tangerine-600"
-              : "cursor-not-allowed text-wood-500"
-          )}
-        >
-          {t("filters.clear")}
-        </button>
       </div>
+
+      {/* Top action bar — only the "Retirer les filtres" button lives
+          here now. The Apply / Cancel pair has moved down so it sits
+          right after the two batched sections it commits (Prix +
+          Marques) and reads as their direct call-to-action. */}
+      {hasFilters ? (
+        <div className="border-y border-wood-300/50 bg-cream-deep/40 px-4 py-3">
+          <button
+            type="button"
+            onClick={resetFilters}
+            className={cn(
+              "inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-red-200 bg-red-50/60 px-4 py-2",
+              "font-mono text-[10px] uppercase tracking-[0.2em] text-red-700 transition-colors",
+              "hover:border-red-300 hover:bg-red-50",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40",
+            )}
+          >
+            <X className="size-3" strokeWidth={2.4} />
+            {lang === "ar" ? "إزالة الفلاتر" : "Retirer les filtres"}
+          </button>
+        </div>
+      ) : null}
 
       {/* Catégories */}
       <FilterSection title={t("filters.section.categories")}>
@@ -294,12 +605,12 @@ function CatalogueContent() {
               {t("filters.allCategories")}
             </CategoryRow>
           </li>
-          {CATEGORIES.map((c) => {
-            const count = PRODUCTS.filter(
-              (p) => p.categorySlug === c.slug
-            ).length;
+          {categoriesList.map((c) => {
+            const subs = c.children ?? [];
             const expanded = expandedCategories.has(c.slug);
-            const hasSubs = c.subCategories.length > 0;
+            const hasSubs = subs.length > 0;
+            const label =
+              lang === "ar" && c.nameAr ? c.nameAr : c.nameFr;
             return (
               <li key={c.slug}>
                 <CategoryRow
@@ -310,28 +621,32 @@ function CatalogueContent() {
                     setActiveCategory(c.slug);
                     setActiveSubCategory(null);
                   }}
-                  count={count}
+                  count={c.productCount}
                   expandable={hasSubs}
                   expanded={expanded}
                   onToggleExpand={() => toggleCategoryExpansion(c.slug)}
                 >
-                  {t(`category.${c.slug}`)}
+                  {label}
                 </CategoryRow>
                 {hasSubs && expanded ? (
                   <ul className="mt-0.5 flex flex-col">
-                    {c.subCategories.map((sc) => (
-                      <li key={sc.slug}>
-                        <SubCategoryRow
-                          active={activeSubCategory === sc.slug}
-                          onClick={() => {
-                            setActiveCategory(c.slug);
-                            setActiveSubCategory(sc.slug);
-                          }}
-                        >
-                          {t(`subcat.${sc.parentSlug}.${sc.slug}`)}
-                        </SubCategoryRow>
-                      </li>
-                    ))}
+                    {subs.map((sc) => {
+                      const subLabel =
+                        lang === "ar" && sc.nameAr ? sc.nameAr : sc.nameFr;
+                      return (
+                        <li key={sc.slug}>
+                          <SubCategoryRow
+                            active={activeSubCategory === sc.slug}
+                            onClick={() => {
+                              setActiveCategory(c.slug);
+                              setActiveSubCategory(sc.slug);
+                            }}
+                          >
+                            {subLabel}
+                          </SubCategoryRow>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
               </li>
@@ -345,7 +660,7 @@ function CatalogueContent() {
         title={t("filters.section.price")}
         trailing={
           <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-wood-700">
-            {formatPrice(priceMin)} — {formatPrice(priceMax)}
+            {formatPrice(draftPriceMin)} — {formatPrice(draftPriceMax)}
           </span>
         }
       >
@@ -353,23 +668,25 @@ function CatalogueContent() {
           min={PRICE_MIN}
           max={PRICE_MAX}
           step={PRICE_STEP}
-          value={[priceMin, priceMax]}
+          value={[draftPriceMin, draftPriceMax]}
           onChange={([lo, hi]) => {
-            setPriceMin(lo);
-            setPriceMax(hi);
+            setDraftPriceMin(lo);
+            setDraftPriceMax(hi);
           }}
         />
         <div className="mt-4 grid grid-cols-2 gap-2">
           <PriceField
             label={t("filters.price.min")}
-            value={priceMin}
-            onChange={(v) => setPriceMin(Math.min(Math.max(0, v), priceMax))}
+            value={draftPriceMin}
+            onChange={(v) =>
+              setDraftPriceMin(Math.min(Math.max(0, v), draftPriceMax))
+            }
           />
           <PriceField
             label={t("filters.price.max")}
-            value={priceMax}
+            value={draftPriceMax}
             onChange={(v) =>
-              setPriceMax(Math.max(Math.min(PRICE_MAX, v), priceMin))
+              setDraftPriceMax(Math.max(Math.min(PRICE_MAX, v), draftPriceMin))
             }
           />
         </div>
@@ -400,7 +717,7 @@ function CatalogueContent() {
             visibleBrandsList.map((b) => (
               <li key={b}>
                 <CheckRow
-                  checked={selectedBrands.has(b)}
+                  checked={draftSelectedBrands.has(b)}
                   onChange={() => toggleBrand(b)}
                 >
                   {b}
@@ -434,6 +751,39 @@ function CatalogueContent() {
         ) : null}
       </FilterSection>
 
+      {/* Apply / Cancel for the batched Prix + Marques sections above.
+          Sits right after Marques so it reads as the direct action
+          for the two filters that don't apply instantly. */}
+      {draftDirty ? (
+        <div className="flex gap-2 border-t border-wood-300/50 bg-cream-deep/40 px-4 py-3">
+          <button
+            type="button"
+            onClick={cancelDraft}
+            className={cn(
+              "inline-flex flex-1 items-center justify-center rounded-full border border-wood-300 bg-cream px-4 py-2.5",
+              "font-mono text-[10.5px] uppercase tracking-[0.2em] text-forest-900 transition-colors",
+              "hover:border-forest-900",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500/40",
+            )}
+          >
+            {lang === "ar" ? "إلغاء" : "Annuler"}
+          </button>
+          <button
+            type="button"
+            onClick={applyDraft}
+            className={cn(
+              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-tangerine-500 px-4 py-2.5",
+              "font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-cream",
+              "shadow-[0_10px_24px_-12px_rgba(234,108,29,0.55)] transition-all duration-200",
+              "hover:-translate-y-0.5 hover:bg-tangerine-600",
+              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/40",
+            )}
+          >
+            {lang === "ar" ? "تطبيق" : "Appliquer"}
+          </button>
+        </div>
+      ) : null}
+
       {/* Disponibilité — last section, no bottom divider */}
       <FilterSection title={t("filters.section.availability")} last>
         <div className="flex flex-col gap-0.5">
@@ -445,6 +795,7 @@ function CatalogueContent() {
           </CheckRow>
         </div>
       </FilterSection>
+
     </div>
   );
 
@@ -479,9 +830,7 @@ function CatalogueContent() {
                 className="size-3 text-wood-500 rtl:rotate-180"
                 strokeWidth={2.2}
               />
-              <span className="text-forest-900">
-                {t(`category.${selectedCategory.slug}`)}
-              </span>
+              <span className="text-forest-900">{selectedCategoryLabel}</span>
             </>
           ) : (
             <span className="text-forest-900">{t("breadcrumb.catalogue")}</span>
@@ -494,9 +843,7 @@ function CatalogueContent() {
             {t("catalogue.eyebrow")}
           </p>
           <h1 className="mt-3 font-display text-[44px] font-bold leading-[1] tracking-[-0.03em] text-forest-900 rtl:pb-2 rtl:leading-[1.25] sm:text-[64px] md:text-[80px]">
-            {selectedCategory
-              ? t(`category.${selectedCategory.slug}`)
-              : t("catalogue.title")}
+            {selectedCategoryLabel ?? t("catalogue.title")}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-wood-700 sm:text-base">
             {t("catalogue.subtitle")}
@@ -547,6 +894,7 @@ function CatalogueContent() {
             {hasFilters ? (
               <span className="inline-grid size-4 place-items-center rounded-full bg-tangerine-500 font-display text-[9px] font-bold text-cream">
                 {(activeCategory ? 1 : 0) +
+                  (activeSubCategory ? 1 : 0) +
                   (promosOnly ? 1 : 0) +
                   (query.trim() ? 1 : 0)}
               </span>
@@ -558,7 +906,7 @@ function CatalogueContent() {
               <>
                 {" "}·{" "}
                 <span className="text-forest-900">
-                  {t(`category.${selectedCategory.slug}`)}
+                  {selectedCategoryLabel}
                 </span>
               </>
             ) : null}
@@ -582,13 +930,23 @@ function CatalogueContent() {
                 <>
                   {" "}·{" "}
                   <span className="text-forest-900">
-                    {t(`category.${selectedCategory.slug}`)}
+                    {selectedCategoryLabel}
                   </span>
                 </>
               ) : null}
             </p>
 
-            {visible.length === 0 ? (
+            {allProducts === null ? (
+              <p className="rounded-md border border-wood-300/40 bg-cream-deep/30 px-4 py-8 text-center font-mono text-[11px] uppercase tracking-[0.18em] text-wood-600">
+                {t("catalogue.search.placeholder")
+                  ? "Chargement…"
+                  : "Loading…"}
+              </p>
+            ) : loadError ? (
+              <p className="rounded-md border border-red-300/60 bg-red-50 px-4 py-6 text-sm text-red-700">
+                {loadError}
+              </p>
+            ) : visible.length === 0 ? (
               <EmptyState onReset={resetFilters} />
             ) : (
               <>
@@ -617,6 +975,39 @@ function CatalogueContent() {
       <MobileFiltersDrawer
         open={mobileFiltersOpen}
         onClose={() => setMobileFiltersOpen(false)}
+        footer={
+          // Dynamic CTA bar:
+          //   • Dirty (price/brand pending) → Annuler + Appliquer
+          //   • Otherwise → Voir les N résultats (closes drawer)
+          // Both states put the action at the bottom edge, always
+          // reachable without scrolling through every section.
+          draftDirty ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={cancelDraft}
+                className="inline-flex flex-1 items-center justify-center rounded-full border border-wood-300 bg-cream px-4 py-3 font-mono text-[10.5px] uppercase tracking-[0.2em] text-forest-900 transition-colors hover:border-forest-900"
+              >
+                {lang === "ar" ? "إلغاء" : "Annuler"}
+              </button>
+              <button
+                type="button"
+                onClick={applyDraft}
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-tangerine-500 px-4 py-3 font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-cream shadow-[0_10px_24px_-12px_rgba(234,108,29,0.55)] transition-colors hover:bg-tangerine-600"
+              >
+                {lang === "ar" ? "تطبيق" : "Appliquer"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen(false)}
+              className="w-full rounded-full bg-tangerine-500 px-4 py-3 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-cream transition-colors hover:bg-tangerine-600"
+            >
+              {t("toolbar.results", { n: visible.length })}
+            </button>
+          )
+        }
       >
         {filtersNode}
       </MobileFiltersDrawer>
@@ -625,11 +1016,38 @@ function CatalogueContent() {
 }
 
 /* ───── Catalogue card — same design as best-sellers ───────────── */
-function CatalogueCard({ product }: { product: Product }) {
+function CatalogueCard({ product }: { product: CatalogueProduct }) {
   const { t } = useLanguage();
   const formatPrice = useFormatPrice();
   const productName = useProductName();
-  const pct = discountPercent(product.price, product.oldPrice);
+  const pct = discountPercent(product.price, product.oldPrice ?? undefined);
+  const displayName = productName({
+    name: product.nameFr,
+    nameAr: product.nameAr ?? undefined,
+  });
+  // The cart + favorites contexts expect the legacy local `Product`
+  // shape. Synthesize one from the backend row so every card gets the
+  // "Ajouter au panier" + heart actions, regardless of whether the
+  // slug happens to exist in the legacy mock catalogue.
+  const cartProduct: Product = React.useMemo(() => {
+    const legacy = PRODUCTS.find((p) => p.slug === product.slug);
+    if (legacy) return legacy;
+    return {
+      slug: product.slug,
+      name: product.nameFr,
+      nameAr: product.nameAr ?? undefined,
+      brand: product.brand,
+      price: product.price,
+      oldPrice: product.oldPrice ?? undefined,
+      image: product.image,
+      categorySlug: product.parentCategorySlug ?? undefined,
+      description: "",
+      features: [],
+      stock: product.stock,
+      trackStock: product.trackStock,
+      allowBackorder: product.allowBackorder,
+    };
+  }, [product]);
   return (
     <TentLink
       href={`/produit/${product.slug}`}
@@ -640,14 +1058,16 @@ function CatalogueCard({ product }: { product: Product }) {
       )}
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-wood-100">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={product.image}
-          alt=""
-          aria-hidden
-          loading="lazy"
-          className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
-        />
+        {product.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.image}
+            alt=""
+            aria-hidden
+            loading="lazy"
+            className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+          />
+        ) : null}
 
         {pct ? (
           <span className="absolute start-3 top-3 z-10 inline-flex items-center rounded-full bg-tangerine-500 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cream shadow-sm sm:start-4 sm:top-4">
@@ -655,12 +1075,12 @@ function CatalogueCard({ product }: { product: Product }) {
           </span>
         ) : null}
 
-        <ProductActions product={product} />
+        <ProductActions product={cartProduct} />
       </div>
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         <h3 className="truncate font-display text-[14.5px] font-semibold leading-snug text-forest-900 sm:text-base">
-          {productName(product)}
+          {displayName}
         </h3>
         <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-wood-600">
           {product.brand}
@@ -676,12 +1096,12 @@ function CatalogueCard({ product }: { product: Product }) {
           ) : null}
         </div>
 
-        <div className="mt-auto flex flex-col gap-2 pt-3 sm:pt-4">
-          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
+        <div className="mt-auto flex flex-col gap-2 pt-3 sm:flex-row sm:pt-4">
+          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-2xl border border-forest-900 bg-forest-900 px-2.5 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-cream transition-colors duration-300 hover:bg-tangerine-500 sm:h-9 sm:flex-1 sm:gap-2 sm:px-3 sm:text-[10px] sm:tracking-[0.2em]">
             <ShoppingBag className="size-3" strokeWidth={2.2} />
             {t("card.order")}
           </span>
-          <AddToCartButton product={product} />
+          <AddToCartButton product={cartProduct} />
         </div>
       </div>
     </TentLink>
@@ -1218,10 +1638,14 @@ function MobileFiltersDrawer({
   open,
   onClose,
   children,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  /** Optional override for the bottom CTA bar. When omitted the drawer
+   *  falls back to a single "show N results" button. */
+  footer?: React.ReactNode;
 }) {
   const { t } = useLanguage();
   React.useEffect(() => {
@@ -1241,7 +1665,12 @@ function MobileFiltersDrawer({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[60] overflow-hidden lg:hidden",
+        // `h-dvh` uses the dynamic viewport height — important on
+        // mobile Safari / Chrome where the address bar and toolbar
+        // shrink/grow with scroll. Without it, `inset-0` extends
+        // behind the browser chrome and the drawer's footer ends up
+        // offscreen, which in turn breaks the inner scroll calc.
+        "fixed inset-x-0 top-0 z-[60] h-dvh overflow-hidden lg:hidden",
         open ? "pointer-events-auto" : "pointer-events-none"
       )}
       aria-hidden={!open}
@@ -1263,7 +1692,10 @@ function MobileFiltersDrawer({
         aria-modal="true"
         aria-label={t("filters.title")}
         className={cn(
-          "absolute inset-y-0 start-0 flex w-[min(85vw,360px)] flex-col bg-cream shadow-[0_-8px_60px_-12px_rgba(31,58,30,0.4)]",
+          // Explicit `h-full` on the aside as a belt-and-suspenders
+          // backup — some older mobile browsers don't propagate the
+          // parent's dvh-based height through `inset-y-0` alone.
+          "absolute inset-y-0 start-0 flex h-full w-[min(85vw,360px)] flex-col bg-cream shadow-[0_-8px_60px_-12px_rgba(31,58,30,0.4)]",
           "transition-transform duration-300 ease-out",
           open
             ? "translate-x-0"
@@ -1283,17 +1715,30 @@ function MobileFiltersDrawer({
             <X className="size-4" strokeWidth={1.8} />
           </button>
         </header>
-        <div className="flex flex-1 flex-col gap-7 overflow-y-auto p-5">
+        {/* Body — full bleed so the filter card hugs the drawer edges
+            and we don't lose horizontal space to extra padding. Bottom
+            padding leaves room above the sticky footer so the last
+            section isn't visually flush with the action bar.
+            `min-h-0` is critical: without it the flex-1 child refuses
+            to shrink below its content height and overflow-y-auto
+            becomes a no-op (classic flexbox+overflow gotcha).
+            Smooth touch scroll on iOS via `-webkit-overflow-scrolling`. */}
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-6"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           {children}
         </div>
-        <footer className="border-t border-wood-300/40 px-5 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full rounded-full bg-tangerine-500 px-4 py-3 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-cream transition-colors hover:bg-tangerine-600"
-          >
-            {t("mobileFilters.show")}
-          </button>
+        <footer className="border-t border-wood-300/40 bg-cream-deep/30 px-4 py-3">
+          {footer ?? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full rounded-full bg-tangerine-500 px-4 py-3 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-cream transition-colors hover:bg-tangerine-600"
+            >
+              {t("mobileFilters.show")}
+            </button>
+          )}
         </footer>
       </aside>
     </div>
