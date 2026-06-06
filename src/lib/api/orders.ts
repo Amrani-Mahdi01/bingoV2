@@ -21,6 +21,9 @@ export interface CreateOrderPayload {
   lines: Array<{
     productSlug: string;
     variant?: string | null;
+    /** Exact variant (color/size) id chosen — lets the backend decrement
+     *  that variant's stock on confirm. Null for products without variants. */
+    variantId?: number | null;
     quantity: number;
   }>;
   /** Google reCAPTCHA v2 response token. Required in production; the

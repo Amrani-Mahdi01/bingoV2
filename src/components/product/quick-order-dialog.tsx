@@ -45,6 +45,9 @@ export interface QuickOrderItem {
   productSlug: string;
   /** Free-text variant label for the order line (color · size), or null. */
   variantLabel: string | null;
+  /** Exact variant id chosen, so the backend can decrement that variant's
+   *  stock on confirm. Null/undefined for products without variants. */
+  variantId?: number | null;
   quantity: number;
   name: string;
   image: string;
@@ -214,6 +217,7 @@ export function QuickOrderDialog({
         lines: items.map((it) => ({
           productSlug: it.productSlug,
           variant: it.variantLabel,
+          variantId: it.variantId ?? null,
           quantity: it.quantity,
         })),
         recaptchaToken: recaptchaToken ?? undefined,

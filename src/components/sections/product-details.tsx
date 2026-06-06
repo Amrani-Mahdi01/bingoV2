@@ -613,6 +613,7 @@ export function ProductDetails({
                   .filter(Boolean)
                   .join(" · ") || null
               : null,
+            variantId: cartVariant ? Number(cartVariant.id) : null,
             quantity: qty,
             name: productName(product),
             image: product.image,

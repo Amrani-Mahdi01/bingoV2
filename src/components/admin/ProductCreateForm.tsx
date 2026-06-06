@@ -216,6 +216,16 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
     })) ?? []
   );
 
+  // Variants own the inventory: when any variant exists, the product's total
+  // stock is the sum of the per-variant stocks. The "Stock" field then goes
+  // read-only and just mirrors this sum, so the total can never contradict the
+  // per-colour / per-size quantities.
+  const hasVariants = variants.length > 0;
+  const variantStock = variants.reduce(
+    (sum, v) => sum + (Number(v.stock) || 0),
+    0,
+  );
+
   // One optional product video (absolute URL once uploaded).
   const [video, setVideo] = React.useState<string | null>(
     initialProduct?.video ?? null
@@ -543,7 +553,9 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       brandId: Number(brandId),
       price: priceN,
       oldPrice: oldN,
-      stock: stockN,
+      // With variants, the total is the sum of variant stocks (backend enforces
+      // the same rule); without variants, the manually-entered total.
+      stock: hasVariants ? variantStock : stockN,
       lowStockThreshold: lowN,
       isActive,
       isNew,
@@ -775,13 +787,23 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
               )}
             />
           </FieldShell>
-          <FieldShell label="Stock" error={errors.stock}>
+          <FieldShell
+            label={hasVariants ? "Stock (somme des variantes)" : "Stock"}
+            error={errors.stock}
+          >
             <Input
               type="number"
               inputMode="numeric"
               min={0}
               step={1}
-              value={stock}
+              value={hasVariants ? String(variantStock) : stock}
+              readOnly={hasVariants}
+              disabled={hasVariants}
+              title={
+                hasVariants
+                  ? "Calculé automatiquement à partir du stock de chaque variante ci-dessous."
+                  : undefined
+              }
               onChange={(e) => {
                 setStock(e.target.value);
                 clearError("stock");
@@ -790,6 +812,7 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
               aria-invalid={!!errors.stock}
               className={cn(
                 "font-mono",
+                hasVariants && "bg-zinc-100 text-zinc-500",
                 errors.stock &&
                   "border-red-500 focus-visible:border-red-600 focus-visible:ring-red-500/20",
               )}
@@ -822,8 +845,9 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       <Section title="Variantes (couleurs &amp; tailles)">
         <VariantManager value={variants} onChange={setVariants} />
         <Small className="text-zinc-500">
-          Le stock par variante remplace celui défini ci-dessus pour les
-          déclinaisons concernées.
+          {hasVariants
+            ? `Le stock total du produit (${variantStock}) est la somme des stocks de variantes ci-dessous. Le champ « Stock » plus haut est en lecture seule.`
+            : "Dès qu'une variante est ajoutée, le stock total devient la somme des stocks de variantes."}
         </Small>
       </Section>
 

@@ -31,6 +31,7 @@ export default function CheckoutPage() {
     variantLabel: variant
       ? [variant.colorNameFr, variant.sizeLabel].filter(Boolean).join(" · ") || null
       : null,
+    variantId: variant?.id != null ? Number(variant.id) : null,
     quantity: qty,
     name: productName(product),
     image: product.image,
