@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Calendar, Check, Download, Eye, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { Calendar, Check, Download, Eye, RefreshCw, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -187,6 +187,8 @@ export default function OrdersPage() {
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<"all" | ApiOrder["status"]>("all");
   const [wilaya, setWilaya] = React.useState<string>("all");
+  // Active list vs the archive (orders auto-archived after 3 months of no change).
+  const [view, setView] = React.useState<"active" | "archived">("active");
   // The page boots with the last 7 days pre-selected — admins should
   // see "today's work" without having to touch the filter bar. Computed
   // once via the useState initializer so the bounds stay stable across
@@ -231,6 +233,7 @@ export default function OrdersPage() {
         q: search.trim() || undefined,
         status: status === "all" ? undefined : status,
         wilayaId: wilaya === "all" ? undefined : wilaya,
+        archived: view === "archived" || undefined,
       });
       setRows(res.data);
       setTotal(res.meta.total);
@@ -245,7 +248,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, wilaya]);
+  }, [search, status, wilaya, view]);
 
   // Pull every active order's delivery status from ZR now, then refresh the
   // table. Manual ZR-03 trigger (the "Statuts ZR" toolbar button).
@@ -402,6 +405,29 @@ export default function OrdersPage() {
     setBulkBusy(false);
   }, [selected, bulkBusy, confirm, clearSelection]);
 
+  // Restore selected orders from the archive (used in the Archive view).
+  const bulkRestore = React.useCallback(async () => {
+    if (selected.size === 0 || bulkBusy) return;
+    const ids = [...selected];
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => ordersApi.restore(id)));
+    const done = ids.filter((_, i) => results[i].status === "fulfilled");
+    const failed = ids.length - done.length;
+    // They leave the archive view, so drop the restored rows from it.
+    setRows((curr) => (curr ? curr.filter((r) => !done.includes(r.id)) : curr));
+    setTotal((t) => Math.max(0, t - done.length));
+    if (failed > 0) {
+      toast.error(`${failed} échec${failed > 1 ? "s" : ""} sur ${ids.length}`);
+    } else {
+      toast.success(
+        `${done.length} commande${done.length > 1 ? "s" : ""} restaurée${done.length > 1 ? "s" : ""}`,
+      );
+    }
+    refreshPendingOrders();
+    clearSelection();
+    setBulkBusy(false);
+  }, [selected, bulkBusy, clearSelection]);
+
   // Drop the selection whenever the visible set changes — selecting
   // rows that get filtered out is confusing.
   React.useEffect(() => {
@@ -516,6 +542,36 @@ export default function OrdersPage() {
           </>
         }
       />
+
+      {/* Active / Archive view toggle */}
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
+        {(
+          [
+            { v: "active", label: "Actives" },
+            { v: "archived", label: "Archivées" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.v}
+            type="button"
+            onClick={() => setView(t.v)}
+            disabled={loading}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-60",
+              view === t.v
+                ? "border-zinc-900 bg-zinc-900 text-zinc-50"
+                : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+        {view === "archived" ? (
+          <span className="ms-1 text-2xs text-zinc-500">
+            Commandes sans activité depuis 3 mois — conservées, restaurables.
+          </span>
+        ) : null}
+      </div>
 
       {/* ---- Filter bar ---- */}
       <div className="mb-5 rounded-md border border-zinc-200 bg-white p-3">
@@ -726,6 +782,18 @@ export default function OrdersPage() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {view === "archived" ? (
+                <button
+                  type="button"
+                  onClick={() => void bulkRestore()}
+                  disabled={bulkBusy}
+                  className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-white px-3 text-xs font-medium text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-50 sm:flex-none"
+                >
+                  <RotateCcw className="size-3.5" />
+                  Restaurer
+                </button>
+              ) : null}
 
               <button
                 type="button"

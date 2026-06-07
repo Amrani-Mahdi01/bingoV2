@@ -121,6 +121,8 @@ export interface ApiOrderRow {
   customerIp: string | null;
   ipBlocked: boolean;
   createdAt: string | null;
+  /** Set when the order is in the archive (auto after 3 months, or manual). */
+  archivedAt?: string | null;
 }
 
 interface ListResponse {
@@ -145,7 +147,15 @@ export const ordersApi = {
 
   /** Admin — paginated index. */
   listAll(
-    params: { page?: number; perPage?: number; q?: string; status?: string; wilayaId?: string } = {},
+    params: {
+      page?: number;
+      perPage?: number;
+      q?: string;
+      status?: string;
+      wilayaId?: string;
+      /** When true, return only archived orders (the active list hides them). */
+      archived?: boolean;
+    } = {},
   ): Promise<ListResponse> {
     const qs = new URLSearchParams();
     if (params.page) qs.set("page", String(params.page));
@@ -153,6 +163,7 @@ export const ordersApi = {
     if (params.q) qs.set("q", params.q);
     if (params.status) qs.set("status", params.status);
     if (params.wilayaId) qs.set("wilayaId", params.wilayaId);
+    if (params.archived) qs.set("archived", "1");
     const url = `/api/admin/orders${qs.toString() ? `?${qs}` : ""}`;
     return http.get<ListResponse>(url, { auth: "admin" });
   },
@@ -193,6 +204,16 @@ export const ordersApi = {
 
   destroy(id: string): Promise<void> {
     return http.delete(`/api/admin/orders/${id}`, { auth: "admin" }) as Promise<void>;
+  },
+
+  /** Move an order to the archive (reversible). */
+  archive(id: string): Promise<void> {
+    return http.post(`/api/admin/orders/${id}/archive`, {}, { auth: "admin" }) as Promise<void>;
+  },
+
+  /** Restore an order from the archive. */
+  restore(id: string): Promise<void> {
+    return http.post(`/api/admin/orders/${id}/unarchive`, {}, { auth: "admin" }) as Promise<void>;
   },
 
   pendingCount(): Promise<number> {
