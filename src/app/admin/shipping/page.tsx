@@ -54,7 +54,6 @@ const NAME_FR_RE = /^(?=.*[A-Za-zÀ-ſ])[\s\S]{2,100}$/;
 const NAME_AR_RE = /^(?=.*[؀-ۿݐ-ݿ])[\s\S]{2,100}$/;
 // Non-negative integer (allows "0"). For shipping price / days.
 const POS_INT_RE = /^(0|[1-9][0-9]*)$/;
-type RegionFilter = WilayaRegion | "all";
 
 function extractMessage(err: unknown, fallback: string): string {
   if (err instanceof HttpError) {
@@ -83,7 +82,6 @@ export default function ShippingPage() {
   const [bulkSaving, setBulkSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
-  const [region, setRegion] = React.useState<RegionFilter>("all");
   const [importing, setImporting] = React.useState(false);
   const confirm = useConfirm();
 
@@ -164,7 +162,6 @@ export default function ShippingPage() {
     if (!list) return [];
     const q = search.trim().toLowerCase();
     return list.filter((w) => {
-      if (region !== "all" && w.region !== region) return false;
       if (!q) return true;
       return (
         w.code.toLowerCase().includes(q) ||
@@ -172,7 +169,7 @@ export default function ShippingPage() {
         w.nameAr.includes(q)
       );
     });
-  }, [list, region, search]);
+  }, [list, search]);
 
   const dirtyRows = React.useMemo(() => {
     if (!list) return [];
@@ -240,22 +237,6 @@ export default function ShippingPage() {
     setDrafts(next);
   };
 
-  // Count per region (used in the filter pills).
-  const counts = React.useMemo(() => {
-    const out: Record<RegionFilter, number> = {
-      all: list?.length ?? 0,
-      Nord: 0,
-      Centre: 0,
-      Est: 0,
-      Ouest: 0,
-      Sud: 0,
-    };
-    if (list) {
-      for (const w of list) out[w.region] = (out[w.region] ?? 0) + 1;
-    }
-    return out;
-  }, [list]);
-
   return (
     <>
       <AdminPageHeader
@@ -297,25 +278,6 @@ export default function ShippingPage() {
               className="pl-9"
               aria-label="Rechercher une wilaya"
             />
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <RegionPill
-              active={region === "all"}
-              count={counts.all}
-              onClick={() => setRegion("all")}
-            >
-              Toutes
-            </RegionPill>
-            {REGIONS.map((r) => (
-              <RegionPill
-                key={r}
-                active={region === r}
-                count={counts[r]}
-                onClick={() => setRegion(r)}
-              >
-                {r}
-              </RegionPill>
-            ))}
           </div>
         </div>
         <Small className="mt-3 block text-zinc-500">
@@ -364,7 +326,7 @@ export default function ShippingPage() {
                     dirty && "border-l-2 border-l-amber-400 bg-amber-50/40",
                   )}
                 >
-                  {/* Header — code badge + FR/AR name + region pill. */}
+                  {/* Header — code badge + FR/AR name. */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 items-start gap-2">
                       <span className="mt-0.5 shrink-0 rounded-full bg-zinc-100 px-1.5 py-0 font-mono text-[10px] text-zinc-600">
@@ -383,7 +345,6 @@ export default function ShippingPage() {
                         </p>
                       </div>
                     </div>
-                    <RegionChip region={w.region} />
                   </div>
 
                   {/* Editable fields — label/value rows. Each input gets
@@ -440,7 +401,6 @@ export default function ShippingPage() {
                 <tr className="border-b border-zinc-200 text-left text-2xs uppercase tracking-wide text-zinc-600">
                   <th className="px-4 py-2.5 font-medium">#</th>
                   <th className="px-4 py-2.5 font-medium">Wilaya</th>
-                  <th className="px-4 py-2.5 font-medium">Région</th>
                   <th className="px-4 py-2.5 font-medium text-right">
                     Domicile
                     <span className="ms-1 font-normal text-zinc-400">DZD</span>
@@ -482,9 +442,6 @@ export default function ShippingPage() {
                         >
                           {w.nameAr}
                         </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <RegionChip region={w.region} />
                       </td>
                       <td className="px-4 py-2 text-right">
                         <FieldWithSuffix
@@ -596,61 +553,6 @@ function InlineErr({ message }: { message: string | undefined }) {
   );
 }
 
-function RegionPill({
-  active,
-  count,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  count: number;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-        active
-          ? "border-zinc-900 bg-zinc-900 text-zinc-50"
-          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
-      )}
-    >
-      <span>{children}</span>
-      <Mono
-        className={cn(
-          "text-2xs",
-          active ? "text-zinc-300" : "text-zinc-400"
-        )}
-      >
-        {count}
-      </Mono>
-    </button>
-  );
-}
-
-const REGION_STYLES: Record<WilayaRegion, string> = {
-  Nord: "bg-sky-50 text-sky-700 ring-sky-200",
-  Centre: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  Est: "bg-violet-50 text-violet-700 ring-violet-200",
-  Ouest: "bg-orange-50 text-orange-700 ring-orange-200",
-  Sud: "bg-amber-50 text-amber-700 ring-amber-200",
-};
-
-function RegionChip({ region }: { region: WilayaRegion }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-medium ring-1 ring-inset",
-        REGION_STYLES[region]
-      )}
-    >
-      {region}
-    </span>
-  );
-}
 
 function FieldWithSuffix({
   value,
