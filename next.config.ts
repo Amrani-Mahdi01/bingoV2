@@ -24,6 +24,21 @@ const nextConfig: NextConfig = {
         source: "/.well-known/api-catalog",
         destination: "/api/well-known/api-catalog",
       },
+      // MCP server card + transport endpoint.
+      {
+        source: "/.well-known/mcp/server-card.json",
+        destination: "/api/well-known/mcp-server-card",
+      },
+      { source: "/mcp", destination: "/api/mcp" },
+      // Agent Skills discovery index + individual SKILL.md docs.
+      {
+        source: "/.well-known/agent-skills/index.json",
+        destination: "/api/agent-skills/index",
+      },
+      {
+        source: "/.well-known/agent-skills/:name/SKILL.md",
+        destination: "/api/agent-skills/skill/:name",
+      },
     ];
   },
 };

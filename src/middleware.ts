@@ -56,5 +56,5 @@ export const config = {
   // Run on everything except Next internals, the API, the admin backoffice
   // (French-only by design), and any file with an extension (static assets,
   // sitemap.xml, robots.txt, llms.txt, og-default.png, icons, …).
-  matcher: ["/((?!_next/|api/|admin|.*\\.).*)"],
+  matcher: ["/((?!_next/|api/|admin|mcp|.*\\.).*)"],
 };
