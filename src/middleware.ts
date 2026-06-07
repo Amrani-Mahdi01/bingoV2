@@ -14,6 +14,20 @@ import { NextResponse, type NextRequest } from "next/server";
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
+  // Markdown for Agents: a request asking for `text/markdown` is served a
+  // markdown rendering of the page instead of HTML. We rewrite to the /api/md
+  // handler with the original path; it fetches the HTML (Accept: text/html, so
+  // no loop) and converts it. Browsers never send this Accept value.
+  const accept = req.headers.get("accept") || "";
+  if (accept.includes("text/markdown")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/api/md";
+    url.search = "";
+    url.searchParams.set("p", pathname);
+    if (search) url.searchParams.set("q", search.replace(/^\?/, ""));
+    return NextResponse.rewrite(url);
+  }
+
   const isArabic = pathname === "/ar" || pathname.startsWith("/ar/");
   const locale = isArabic ? "ar" : "fr";
 
