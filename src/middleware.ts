@@ -21,14 +21,21 @@ export function middleware(req: NextRequest) {
   headers.set("x-locale", locale);
   headers.set("x-pathname", pathname);
 
-  if (isArabic) {
-    const url = req.nextUrl.clone();
-    url.pathname = pathname.slice(3) || "/"; // drop the leading "/ar"
-    url.search = search;
-    return NextResponse.rewrite(url, { request: { headers } });
-  }
+  const res = isArabic
+    ? (() => {
+        const url = req.nextUrl.clone();
+        url.pathname = pathname.slice(3) || "/"; // drop the leading "/ar"
+        url.search = search;
+        return NextResponse.rewrite(url, { request: { headers } });
+      })()
+    : NextResponse.next({ request: { headers } });
 
-  return NextResponse.next({ request: { headers } });
+  // Agent discovery (RFC 8288): advertise the machine-readable site descriptor
+  // with a registered relation type so AI agents can find it from any page.
+  // `/llms.txt` describes the store for LLMs. Appended (not set) so Next's
+  // asset-preload Link headers are preserved alongside it.
+  res.headers.append("Link", '</llms.txt>; rel="describedby"');
+  return res;
 }
 
 export const config = {
