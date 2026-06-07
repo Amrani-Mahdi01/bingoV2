@@ -394,9 +394,21 @@ html[dir="rtl"] {
 [dir="rtl"] * {
   letter-spacing: 0 !important;
 }
-/* Micro-labels are set in fixed px (text-[10px]…[12px]) so they don't grow
-   with the root bump — and 10px Arabic is unreadable. Lift the mono labels to
-   a legible floor in RTL only (Latin keeps its tighter sizing). */
-[dir="rtl"] .font-mono {
+/* Micro text is set in fixed px (text-[9px]…[13.5px]) so it does NOT grow with
+   the root bump — and Arabic under ~13px is hard to read. Floor every small
+   size to a legible minimum in RTL only (the French site keeps its tighter
+   labels). Verified none of these pair with a larger responsive size, so
+   nothing shrinks on desktop. Covers all fonts (display tagline, mono labels,
+   sans), which the earlier mono-only rule missed. */
+[dir="rtl"] .text-\[9px\],
+[dir="rtl"] .text-\[9\.5px\],
+[dir="rtl"] .text-\[10px\],
+[dir="rtl"] .text-\[10\.5px\],
+[dir="rtl"] .text-\[11px\],
+[dir="rtl"] .text-\[11\.5px\],
+[dir="rtl"] .text-\[12px\],
+[dir="rtl"] .text-\[12\.5px\],
+[dir="rtl"] .text-\[13px\],
+[dir="rtl"] .text-\[13\.5px\] {
   font-size: 0.8125rem;
 }
