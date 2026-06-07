@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import {
+  RotateCcw,
   ShoppingBag,
+  Target,
   TrendingUp,
   Users,
   Wallet,
@@ -45,28 +47,31 @@ export function DashboardKpis({ stats }: Props) {
   const series = Array.isArray(revenueLast30) ? revenueLast30 : [];
   const top = Array.isArray(topProducts) ? topProducts : [];
 
-  // 7-day rolling deltas + sparkline arrays so the KPI tiles stay alive
-  // even when there's only one real day of data.
-  const last7 = series.slice(-7);
-  const prev7 = series.slice(-14, -7);
-  const sumRev = (rows: typeof series) =>
-    rows.reduce((s, r) => s + r.revenue, 0);
-  const sumOrders = (rows: typeof series) =>
-    rows.reduce((s, r) => s + r.orders, 0);
+  // Selected window + human label (falls back to 30 j for older API responses).
+  const days = kpis.rangeDays ?? 30;
+  const periodLabel =
+    days === 7 ? "7 jours"
+    : days === 30 ? "30 jours"
+    : days === 90 ? "3 mois"
+    : days === 365 ? "1 an"
+    : `${days} j`;
+  const periodShort =
+    days === 7 ? "7 j" : days === 30 ? "30 j" : days === 90 ? "90 j" : "1 an";
+  const monthly = days > 90;
 
-  const last7Rev = sumRev(last7);
-  const prev7Rev = sumRev(prev7);
+  // Window figures + delta vs the previous equal window (from the API).
+  const revenue = kpis.rangeRevenue ?? kpis.monthRevenue;
+  const orders = kpis.rangeOrders ?? kpis.monthOrders;
+  const prevRevenue = kpis.prevRevenue ?? 0;
+  const prevOrders = kpis.prevOrders ?? 0;
   const revDelta =
-    prev7Rev > 0 ? (last7Rev - prev7Rev) / prev7Rev : last7Rev > 0 ? 1 : 0;
-
-  const last7Orders = sumOrders(last7);
-  const prev7Orders = sumOrders(prev7);
+    prevRevenue > 0 ? (revenue - prevRevenue) / prevRevenue : revenue > 0 ? 1 : 0;
   const ordersDelta =
-    prev7Orders > 0
-      ? (last7Orders - prev7Orders) / prev7Orders
-      : last7Orders > 0
-        ? 1
-        : 0;
+    prevOrders > 0 ? (orders - prevOrders) / prevOrders : orders > 0 ? 1 : 0;
+
+  const conversionRate = kpis.conversionRate ?? 0;
+  const returnRate = kpis.returnRate ?? 0;
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
   // Top wilayas by revenue, top 6 for the horizontal-bar widget.
   const topWilayas = [...byWilaya]
@@ -81,33 +86,42 @@ export function DashboardKpis({ stats }: Props) {
   return (
     <div className="space-y-5">
       {/* KPI tiles */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
-          label="CA (30 jours)"
-          value={formatDZD(kpis.monthRevenue, "fr")}
+          label={`CA (${periodShort})`}
+          value={formatDZD(revenue, "fr")}
           change={revDelta}
-          subtitle="vs. les 7 jours précédents"
+          subtitle="vs. période précédente"
           icon={Wallet}
         >
-          <Sparkline data={series.slice(-14).map((d) => d.revenue)} />
+          <Sparkline data={series.map((d) => d.revenue)} />
         </StatCard>
         <StatCard
-          label="Commandes (30 j)"
-          value={String(kpis.monthOrders)}
+          label={`Commandes livrées (${periodShort})`}
+          value={String(orders)}
           change={ordersDelta}
           subtitle={`${kpis.pendingOrders} en attente`}
           icon={ShoppingBag}
         >
-          <Sparkline
-            data={series.slice(-14).map((d) => d.orders)}
-            color="#10b981"
-          />
+          <Sparkline data={series.map((d) => d.orders)} color="#10b981" />
         </StatCard>
         <StatCard
           label="Panier moyen"
           value={formatDZD(kpis.averageOrderValue, "fr")}
-          subtitle="sur les 30 derniers jours"
+          subtitle={`sur ${periodLabel}`}
           icon={TrendingUp}
+        />
+        <StatCard
+          label="Taux de conversion"
+          value={pct(conversionRate)}
+          subtitle="livrées / commandes reçues"
+          icon={Target}
+        />
+        <StatCard
+          label="Taux de retour"
+          value={pct(returnRate)}
+          subtitle={`${kpis.returnedOrders ?? 0} commande(s) retournée(s)`}
+          icon={RotateCcw}
         />
         <StatCard
           label="Clients uniques"
@@ -124,7 +138,7 @@ export function DashboardKpis({ stats }: Props) {
             <div>
               <Mono className="text-zinc-500">Chiffre d&apos;affaires</Mono>
               <h3 className="mt-0.5 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
-                Évolution sur 30 jours
+                Évolution sur {periodLabel}
               </h3>
             </div>
             <span className="font-mono text-2xs text-zinc-400">
@@ -137,7 +151,7 @@ export function DashboardKpis({ stats }: Props) {
           <div className="mb-3">
             <Mono className="text-zinc-500">Volume</Mono>
             <h3 className="mt-0.5 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
-              Commandes par jour
+              Commandes par {monthly ? "mois" : "jour"}
             </h3>
           </div>
           <OrdersBarChart data={series} />
@@ -188,12 +202,10 @@ export function DashboardKpis({ stats }: Props) {
       <div className="rounded-md border border-zinc-200 bg-white p-4 sm:p-5">
         <Mono className="text-zinc-500">Catalogue</Mono>
         <h3 className="mt-0.5 mb-4 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
-          Top produits — chiffre d&apos;affaires sur 30 jours
+          Top produits — chiffre d&apos;affaires sur {periodLabel}
         </h3>
         {topProductsBars.length === 0 ? (
-          <p className="text-xs text-zinc-500">
-            Aucune vente sur les 30 derniers jours.
-          </p>
+          <p className="text-xs text-zinc-500">Aucune vente sur {periodLabel}.</p>
         ) : (
           <HorizontalBars
             data={topProductsBars}

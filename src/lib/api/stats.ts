@@ -2,18 +2,37 @@
 
 import { http } from "@/lib/api/http";
 
+/** Periods the dashboard filter offers (days). */
+export const STATS_RANGES = [
+  { days: 7, label: "7 jours" },
+  { days: 30, label: "1 mois" },
+  { days: 90, label: "3 mois" },
+  { days: 365, label: "1 an" },
+] as const;
+
 export interface DashboardStats {
   kpis: {
-    todayRevenue: number;
-    todayOrders: number;
-    weekRevenue: number;
-    weekOrders: number;
-    monthRevenue: number;
-    monthOrders: number;
+    /** Selected window (days) + its revenue/orders/AOV. */
+    rangeDays?: number;
+    rangeRevenue?: number;
+    rangeOrders?: number;
     averageOrderValue: number;
+    /** Previous equal window, for deltas. */
+    prevRevenue?: number;
+    prevOrders?: number;
+    /** Rates in 0..1. */
+    conversionRate?: number;
+    returnRate?: number;
+    deliveredOrders?: number;
+    returnedOrders?: number;
+    cancelledOrders?: number;
+    totalOrdersInRange?: number;
     pendingOrders: number;
     totalCustomers: number;
     totalProducts: number;
+    /** Back-compat aliases (mirror the selected window). */
+    monthRevenue: number;
+    monthOrders: number;
   };
   revenueLast30: Array<{ date: string; revenue: number; orders: number }>;
   statusBreakdown: Record<string, number>;
@@ -35,7 +54,11 @@ export interface DashboardStats {
 }
 
 export const statsApi = {
-  dashboard(): Promise<DashboardStats> {
-    return http.get<DashboardStats>("/api/admin/stats/dashboard", { auth: "admin" });
+  /** @param range window in days (7 | 30 | 90 | 365). Defaults to 30. */
+  dashboard(range = 30): Promise<DashboardStats> {
+    return http.get<DashboardStats>(
+      `/api/admin/stats/dashboard?range=${range}`,
+      { auth: "admin" },
+    );
   },
 };
