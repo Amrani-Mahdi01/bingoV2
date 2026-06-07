@@ -13,6 +13,18 @@ import { NodeHtmlMarkdown } from "node-html-markdown";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Decode the handful of HTML entities that show up in <title>. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
+}
+
 /** Pull the meaningful content out of a full HTML document. */
 function extractContent(html: string): string {
   const strip = (s: string) =>
@@ -63,7 +75,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch
-    ? titleMatch[1].replace(/\s+/g, " ").trim()
+    ? decodeEntities(titleMatch[1].replace(/\s+/g, " ").trim())
     : "BINGO Camping";
 
   const md = NodeHtmlMarkdown.translate(extractContent(html)).trim();

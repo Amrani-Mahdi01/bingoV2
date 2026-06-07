@@ -15,6 +15,17 @@ const nextConfig: NextConfig = {
     "*.local",
     "*.localhost",
   ],
+  // Next's app router can't host a literal `.well-known` folder, so expose the
+  // RFC 9727 API catalog (served by the route under /api/well-known) at its
+  // canonical path.
+  async rewrites() {
+    return [
+      {
+        source: "/.well-known/api-catalog",
+        destination: "/api/well-known/api-catalog",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
