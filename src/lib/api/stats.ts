@@ -43,6 +43,15 @@ export interface DashboardStats {
     units: number;
     revenue: number;
   }>;
+  /** What customers are buying, grouped by category (revenue + units). */
+  topCategories?: Array<{ name: string; units: number; revenue: number }>;
+  /** Most-returned products in the window (by units). */
+  topReturnedProducts?: Array<{
+    productId: string | null;
+    name: string;
+    units: number;
+    revenue: number;
+  }>;
   byWilaya: Array<{
     wilayaCode: string;
     wilayaName: string;

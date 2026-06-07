@@ -83,6 +83,18 @@ export function DashboardKpis({ stats }: Props) {
     .slice(0, 6)
     .map((p) => ({ label: p.name, value: p.revenue }));
 
+  // What's being bought, by category (revenue), and the most-returned products.
+  const topCategoriesBars = (
+    Array.isArray(stats.topCategories) ? stats.topCategories : []
+  )
+    .slice(0, 8)
+    .map((c) => ({ label: c.name, value: c.revenue }));
+  const returnedBars = (
+    Array.isArray(stats.topReturnedProducts) ? stats.topReturnedProducts : []
+  )
+    .slice(0, 8)
+    .map((p) => ({ label: p.name, value: p.units }));
+
   return (
     <div className="space-y-5">
       {/* KPI tiles */}
@@ -212,6 +224,38 @@ export function DashboardKpis({ stats }: Props) {
             formatValue={(v) => formatDZD(v, "fr")}
           />
         )}
+      </div>
+
+      {/* Categories bought + most-returned products */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-md border border-zinc-200 bg-white p-4 sm:p-5">
+          <Mono className="text-zinc-500">Catégories</Mono>
+          <h3 className="mt-0.5 mb-4 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
+            Top catégories — chiffre d&apos;affaires sur {periodLabel}
+          </h3>
+          {topCategoriesBars.length === 0 ? (
+            <p className="text-xs text-zinc-500">Aucune vente sur {periodLabel}.</p>
+          ) : (
+            <HorizontalBars
+              data={topCategoriesBars}
+              formatValue={(v) => formatDZD(v, "fr")}
+            />
+          )}
+        </div>
+        <div className="rounded-md border border-zinc-200 bg-white p-4 sm:p-5">
+          <Mono className="text-zinc-500">Retours</Mono>
+          <h3 className="mt-0.5 mb-4 font-sans text-base font-semibold text-zinc-900 sm:text-lg">
+            Produits les plus retournés sur {periodLabel}
+          </h3>
+          {returnedBars.length === 0 ? (
+            <p className="text-xs text-zinc-500">Aucun retour sur {periodLabel}.</p>
+          ) : (
+            <HorizontalBars
+              data={returnedBars}
+              formatValue={(v) => `${v} u.`}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
