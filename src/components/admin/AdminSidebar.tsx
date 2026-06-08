@@ -118,7 +118,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
       </div>
 
       {/* Sections */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
+      <nav className="admin-scrollbar flex-1 overflow-y-auto px-2 py-3">
         <ul className="space-y-0.5">
           {adminNav.map((section) => (
             <SidebarSection

@@ -158,6 +158,15 @@ export function ProductDetails({
   // path is unchanged (selectedVariant takes priority over top-level).
   const outOfStock = isProductOutOfStock(product, selectedVariant);
 
+  // Keep qty within the selected variant's stock (Bug #005). The stepper's
+  // "+" already caps, but switching to a lower-stock variant after raising
+  // the quantity would otherwise leave qty above what's available — re-clamp
+  // here so the value can never exceed stock before it reaches the cart/order.
+  React.useEffect(() => {
+    if (stockForSelection == null) return;
+    setQty((q) => Math.min(Math.max(1, q), Math.max(1, stockForSelection)));
+  }, [stockForSelection]);
+
   // Length probe runs against the visible text only — the raw HTML
   // includes tags that would skew the count.
   const plainLength = React.useMemo(
@@ -405,21 +414,17 @@ export function ProductDetails({
                     {lang === "ar" ? "المقاس" : "Taille"}
                   </span>
                   {stockForSelection != null ? (
+                    // Generic availability only — the exact remaining count is
+                    // confidential (Bug #004), so never surface the number.
                     <span
                       className={cn(
                         "font-mono text-[10px] uppercase tracking-[0.18em]",
-                        outOfStock
-                          ? "text-red-700"
-                          : stockForSelection < 5
-                            ? "text-tangerine-700"
-                            : "text-wood-600",
+                        outOfStock ? "text-red-700" : "text-wood-600",
                       )}
                     >
                       {outOfStock
-                        ? lang === "ar" ? "نفد المخزون" : "Épuisé"
-                        : lang === "ar"
-                          ? `متبقي ${stockForSelection}`
-                          : `${stockForSelection} en stock`}
+                        ? lang === "ar" ? "نفد المخزون" : "Rupture de stock"
+                        : lang === "ar" ? "متوفر" : "En stock"}
                     </span>
                   ) : null}
                 </div>

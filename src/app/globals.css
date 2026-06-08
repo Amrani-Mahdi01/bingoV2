@@ -367,6 +367,31 @@
   background-color: #b89e72;
 }
 
+/* Dark sidebar scrollbar (admin nav). The default browser scrollbar shows a
+   white track/gutter that clashes with the zinc-900 menu (Bug #003) — render
+   a transparent track with a faint light thumb so it blends into the menu. */
+.admin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.admin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.admin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+}
+.admin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.32);
+}
+.admin-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ───────────────── Arabic (RTL) typography ─────────────────
    Three Arabic-specific fixes, scoped to the RTL storefront so the French
    site and the (LTR) admin are untouched. These rules sit OUTSIDE @layer on
