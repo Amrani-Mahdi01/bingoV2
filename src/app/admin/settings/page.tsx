@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { BackupManager } from "@/components/admin/BackupManager";
 import { LogoManager } from "@/components/admin/LogoManager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,11 @@ export default function SettingsPage() {
       {/* Logo — wired to /api/admin/settings + /api/admin/uploads/logo */}
       <div className="mb-6">
         <LogoManager />
+      </div>
+
+      {/* Database backup — streams a full .sql dump via /api/admin/backup/database */}
+      <div className="mb-6">
+        <BackupManager />
       </div>
 
       <form onSubmit={onSave} className="space-y-6 pb-32">
