@@ -41,7 +41,7 @@ export default function SettingsPage() {
         <LogoManager />
       </div>
 
-      {/* Database backup — streams a full .sql dump via /api/admin/backup/database */}
+      {/* Database backup & restore — server-side snapshots via /api/admin/backups */}
       <div className="mb-6">
         <BackupManager />
       </div>
