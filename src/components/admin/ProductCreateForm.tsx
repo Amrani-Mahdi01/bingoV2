@@ -155,7 +155,7 @@ const NON_NEG_INT_RE = /^(0|[1-9]\d*)$/;
 
 // Hard cap on product photos. Enforced here in the upload UI and again on
 // the backend at product save (StoreProductRequest).
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 10;
 
 export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {}) {
   const router = useRouter();
@@ -323,8 +323,8 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       : [];
     if (list.length === 0) return;
 
-    // Enforce the 5-photo cap. Compute the free slots from the current
-    // count and trim the incoming batch (drag-drop can carry many files).
+    // Enforce the photo cap (MAX_IMAGES). Compute the free slots from the
+    // current count and trim the incoming batch (drag-drop can carry many files).
     const remaining = MAX_IMAGES - images.length;
     if (remaining <= 0) {
       toast.error(`Maximum ${MAX_IMAGES} photos par produit.`);
@@ -866,7 +866,7 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
         <div className="space-y-3">
           {images.length > 0 ? (
             <>
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
                 {images.map((img, i) => {
                   const isPrincipal = i === 0;
                   return (
@@ -892,6 +892,20 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
                         alt=""
                         className="absolute inset-0 size-full object-cover"
                       />
+
+                      {/* Position badge — clarifies the photo order when
+                          several are uploaded. Emerald on the principal so it
+                          reads as "#1 = cover". */}
+                      <span
+                        className={cn(
+                          "absolute left-2 top-2 inline-flex size-5 items-center justify-center rounded-full font-mono text-2xs font-semibold tabular-nums shadow-sm ring-1",
+                          isPrincipal
+                            ? "bg-emerald-600 text-white ring-emerald-700/30"
+                            : "bg-white/95 text-zinc-600 ring-zinc-200"
+                        )}
+                      >
+                        {i + 1}
+                      </span>
 
                       {/* Bottom-bar overlay — emerald on the principal,
                           ghost call-to-action on the others ("Définir
@@ -936,7 +950,7 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
 
           {/* Dropzone — click to open file picker OR drag images onto it.
               Accepts multiple files in one drop; first file becomes the
-              principal photo. Hidden once the 5-photo cap is reached. */}
+              principal photo. Hidden once the MAX_IMAGES cap is reached. */}
           {images.length < MAX_IMAGES ? (
           <label
             onDragEnter={onDragEnter}
