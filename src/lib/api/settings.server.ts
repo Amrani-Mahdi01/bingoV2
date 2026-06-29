@@ -1,4 +1,5 @@
 import type { SettingsMap } from "@/lib/api/settings";
+import { serverFetch } from "@/lib/server/server-fetch";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
@@ -10,7 +11,7 @@ const API_URL =
  */
 export async function getPublicSettings(): Promise<SettingsMap> {
   try {
-    const res = await fetch(`${API_URL}/api/settings`, {
+    const res = await serverFetch(`${API_URL}/api/settings`, {
       headers: { Accept: "application/json" },
       next: { revalidate: 60, tags: ["settings"] },
     });

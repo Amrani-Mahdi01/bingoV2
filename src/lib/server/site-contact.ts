@@ -19,6 +19,7 @@ import {
   type SiteCategories,
   type SiteCategory,
 } from "@/lib/site-categories";
+import { serverFetch } from "@/lib/server/server-fetch";
 
 /**
  * Server-side fetch of the public /api/settings map. Next.js dedupes
@@ -36,7 +37,7 @@ async function fetchSettingsMap(): Promise<Record<
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (!base) return null;
   try {
-    const res = await fetch(`${base}/api/settings`, {
+    const res = await serverFetch(`${base}/api/settings`, {
       // Refresh every 10s — the client-side provider also fetches the
       // map on mount with `cache: "no-store"`, so even when this SSR
       // cache is stale, the visible top bar updates within a tick of
@@ -105,23 +106,23 @@ export async function getServerSiteHome(): Promise<SiteHome> {
   // in parallel. Each is a single request — cheaper than per-slug lookups.
   const [productsRes, categoriesRes, bestRes, newRes, promoRes] = await Promise.allSettled([
     productSlugs.length > 0
-      ? fetch(`${apiBase}/api/products?perPage=100`, { next: { revalidate: 30 } })
+      ? serverFetch(`${apiBase}/api/products?perPage=100`, { next: { revalidate: 30 } })
       : Promise.resolve(null),
     categorySlugs.length > 0
-      ? fetch(`${apiBase}/api/categories`, { next: { revalidate: 30 } })
+      ? serverFetch(`${apiBase}/api/categories`, { next: { revalidate: 30 } })
       : Promise.resolve(null),
-    fetch(
+    serverFetch(
       `${apiBase}/api/products?flag=bestseller&sort=bestseller&perPage=4`,
       { next: { revalidate: 30 } },
     ),
-    fetch(
+    serverFetch(
       `${apiBase}/api/products?flag=new&sort=new&perPage=4`,
       { next: { revalidate: 30 } },
     ),
     // perPage=50 is enough headroom to find the real max discount
     // without paging through the whole promo list. meta.total carries
     // the true count.
-    fetch(
+    serverFetch(
       `${apiBase}/api/products?promoOnly=1&perPage=50`,
       { next: { revalidate: 30 } },
     ),
@@ -265,7 +266,7 @@ export async function getServerSiteHome(): Promise<SiteHome> {
   // the top-sold products instead so the section isn't empty.
   if (bestSellers.length === 0) {
     try {
-      const fallback = await fetch(
+      const fallback = await serverFetch(
         `${apiBase}/api/products?sort=bestseller&perPage=4`,
         { next: { revalidate: 30 } },
       );
@@ -312,7 +313,7 @@ export async function getServerSiteHome(): Promise<SiteHome> {
   }
   if (newest.length === 0) {
     try {
-      const fallback = await fetch(
+      const fallback = await serverFetch(
         `${apiBase}/api/products?sort=new&perPage=4`,
         { next: { revalidate: 30 } },
       );
@@ -371,7 +372,7 @@ export async function getServerCategories(): Promise<SiteCategories> {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (!base) return SITE_CATEGORIES_DEFAULTS;
   try {
-    const res = await fetch(`${base}/api/categories`, {
+    const res = await serverFetch(`${base}/api/categories`, {
       next: { revalidate: 30 },
     });
     if (!res.ok) return SITE_CATEGORIES_DEFAULTS;

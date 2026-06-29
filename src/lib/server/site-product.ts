@@ -3,6 +3,7 @@ import {
   type Product,
   type ProductVariant,
 } from "@/lib/products";
+import { serverFetch } from "@/lib/server/server-fetch";
 
 /**
  * Server-side fetch of a single product by slug, projected to the
@@ -23,7 +24,7 @@ export async function getServerProductBySlug(
   if (!base) return getProduct(slug);
 
   try {
-    const res = await fetch(
+    const res = await serverFetch(
       `${base}/api/products/${encodeURIComponent(slug)}`,
       {
         // Refresh every 30s — admin price/description edits propagate
@@ -165,7 +166,7 @@ export async function getServerSimilarProducts(
     // Pull one extra so we still have `limit` rows after filtering out
     // the current product.
     params.set("perPage", String(limit + 1));
-    const res = await fetch(`${base}/api/products?${params.toString()}`, {
+    const res = await serverFetch(`${base}/api/products?${params.toString()}`, {
       next: { revalidate: 30 },
     });
     if (!res.ok) return [];

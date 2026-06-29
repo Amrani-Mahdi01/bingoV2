@@ -1,4 +1,5 @@
 import type { Banner } from "@/lib/types";
+import { serverFetch } from "@/lib/server/server-fetch";
 
 /**
  * Server-side banner fetch. The homepage is an RSC, so the client-side
@@ -11,7 +12,7 @@ const API_URL =
 
 export async function listPublicBanners(): Promise<Banner[]> {
   try {
-    const res = await fetch(`${API_URL}/api/banners`, {
+    const res = await serverFetch(`${API_URL}/api/banners`, {
       headers: { Accept: "application/json" },
       // Re-fetch at most every 60s so admin edits propagate without an
       // explicit revalidation hook.

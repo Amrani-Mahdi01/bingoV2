@@ -1,4 +1,5 @@
 import type { ApiCategory } from "@/lib/api/categories";
+import { serverFetch } from "@/lib/server/server-fetch";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
@@ -10,7 +11,7 @@ const API_URL =
  */
 export async function listPublicCategories(): Promise<ApiCategory[]> {
   try {
-    const res = await fetch(`${API_URL}/api/categories`, {
+    const res = await serverFetch(`${API_URL}/api/categories`, {
       headers: { Accept: "application/json" },
       next: { revalidate: 60, tags: ["categories"] },
     });

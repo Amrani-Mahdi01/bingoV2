@@ -1,4 +1,5 @@
 import type { ApiProduct } from "@/lib/api/products";
+import { serverFetch } from "@/lib/server/server-fetch";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
@@ -52,7 +53,7 @@ export async function listPublicProducts(
   try {
     const qs = buildQuery(params);
     const url = `${API_URL}/api/products${qs ? `?${qs}` : ""}`;
-    const res = await fetch(url, {
+    const res = await serverFetch(url, {
       headers: { Accept: "application/json" },
       next: { revalidate: 60, tags: ["products"] },
     });
@@ -68,7 +69,7 @@ export async function getPublicProductBySlug(
   slug: string,
 ): Promise<ApiProduct | null> {
   try {
-    const res = await fetch(`${API_URL}/api/products/${encodeURIComponent(slug)}`, {
+    const res = await serverFetch(`${API_URL}/api/products/${encodeURIComponent(slug)}`, {
       headers: { Accept: "application/json" },
       // No long cache on the detail page so view_count + edits propagate.
       next: { revalidate: 10, tags: ["products", `product:${slug}`] },
