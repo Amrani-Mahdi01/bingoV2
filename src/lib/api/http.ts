@@ -107,7 +107,17 @@ async function request<T = unknown>(
 ): Promise<T> {
   const { method = "GET", body, formData, auth = "admin", headers = {}, signal } = options;
 
-  const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  // Customer-facing calls go through the same-origin `/bk` proxy (next.config
+  // rewrite) so they work on mobile networks that can't reach the backend host
+  // directly. Admin calls (/api/admin/*) and uploads stay DIRECT: the admin
+  // dashboard fires ~15 calls at once and that burst tripped the proxy's rate
+  // limit, and admins are on good connections. SSR / no-window uses direct too.
+  const isAdmin = normalizedPath.startsWith("/api/admin");
+  const url =
+    typeof window !== "undefined" && !formData && !isAdmin
+      ? `/bk${normalizedPath.replace(/^\/api/, "")}`
+      : `${API_URL}${normalizedPath}`;
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
     ...headers,

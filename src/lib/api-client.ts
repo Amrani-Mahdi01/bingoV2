@@ -11,8 +11,20 @@ const HOST = (
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
 
-/** Where the browser sends API calls — directly to the backend host. */
-const baseUrl = (): string => `${HOST}/api`;
+/**
+ * Where the browser sends each API call.
+ *
+ * Customer-facing calls (/auth/*, storefront) go through the same-origin
+ * `/bk` proxy (next.config rewrite) so they work on mobile networks that
+ * can't reach the backend host directly. Admin calls (/admin/*) stay DIRECT
+ * to the backend: the admin dashboard fires a burst of calls that tripped the
+ * proxy's rate limit, and admins are on good connections anyway. On the server
+ * (SSR) there's no same-origin, so always use the absolute backend URL.
+ */
+const urlFor = (path: string): string =>
+  typeof window !== "undefined" && !path.startsWith("/admin")
+    ? `/bk${path}`
+    : `${HOST}/api${path}`;
 
 /**
  * Master switch for the auth flow.
@@ -146,7 +158,7 @@ export async function apiFetch<T = unknown>(
 
     let res: Response;
     try {
-      res = await fetch(`${baseUrl()}${path}`, { ...init, signal: controller.signal });
+      res = await fetch(urlFor(path), { ...init, signal: controller.signal });
     } catch (err) {
       // The caller cancelled on purpose (navigated away) — don't retry.
       if (externalSignal?.aborted) throw err;

@@ -115,7 +115,8 @@ export function SiteContactProvider({
     // Then fetch the live server map and re-apply so admin edits show up
     // even when SSR is still serving a stale revalidate-60 cache.
     if (API_URL) {
-      fetch(`${API_URL}/api/settings`, { cache: "no-store" })
+      // Public settings via the same-origin `/bk` proxy so it works on mobile.
+      fetch(`/bk/settings`, { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((body) => {
           const data = body?.data;
