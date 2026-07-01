@@ -107,17 +107,7 @@ async function request<T = unknown>(
 ): Promise<T> {
   const { method = "GET", body, formData, auth = "admin", headers = {}, signal } = options;
 
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  // Browser calls go through the same-origin `/bk` proxy (next.config
-  // rewrites) so the client never hits the backend host directly — this
-  // fixes mobile networks that reach Vercel but not the backend server, and
-  // drops cross-origin CORS. Multipart uploads stay DIRECT to the backend
-  // (absolute URL) to sidestep the proxy's request-body size limit — product
-  // photos/videos can be large. SSR / no-window also uses the absolute URL.
-  const url =
-    typeof window !== "undefined" && !formData
-      ? `/bk${normalizedPath.replace(/^\/api/, "")}`
-      : `${API_URL}${normalizedPath}`;
+  const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
     ...headers,
