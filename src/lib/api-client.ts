@@ -191,6 +191,18 @@ export async function apiFetch<T = unknown>(
       }
     }
 
+    if (res.status === 429) {
+      // Rate-limited. Laravel's default message is English ("Too Many
+      // Attempts.") — surface a clear French one, with the wait time when the
+      // Retry-After header is present.
+      const retry = Number(res.headers.get("Retry-After"));
+      const wait =
+        Number.isFinite(retry) && retry > 0
+          ? ` Réessayez dans ${retry} seconde${retry > 1 ? "s" : ""}.`
+          : " Patientez un instant et réessayez.";
+      throw new ApiError(`Trop de tentatives.${wait}`, 429);
+    }
+
     if (!res.ok) {
       const payload =
         typeof data === "object" && data !== null
