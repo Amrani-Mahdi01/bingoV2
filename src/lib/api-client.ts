@@ -10,7 +10,19 @@
 const HOST = (
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
-const BASE_URL = `${HOST}/api`;
+
+/**
+ * Where the browser sends API calls.
+ *
+ * In the browser we go through the same-origin `/bk` proxy (see next.config
+ * rewrites): the device never contacts the backend host directly — which
+ * fixes mobile networks that can reach Vercel but not the backend server —
+ * and there's no cross-origin CORS. On the server (SSR / build) there is no
+ * same-origin, so fall back to the absolute backend URL. apiFetch is
+ * client-only in practice; this just keeps any stray SSR call working.
+ */
+const baseUrl = (): string =>
+  typeof window !== "undefined" ? "/bk" : `${HOST}/api`;
 
 /**
  * Master switch for the auth flow.
@@ -144,7 +156,7 @@ export async function apiFetch<T = unknown>(
 
     let res: Response;
     try {
-      res = await fetch(`${BASE_URL}${path}`, { ...init, signal: controller.signal });
+      res = await fetch(`${baseUrl()}${path}`, { ...init, signal: controller.signal });
     } catch (err) {
       // The caller cancelled on purpose (navigated away) — don't retry.
       if (externalSignal?.aborted) throw err;

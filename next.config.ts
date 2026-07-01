@@ -1,5 +1,11 @@
 import type { NextConfig } from "next";
 
+// Origin of the Laravel backend. The browser no longer calls this host
+// directly (see the `/bk` rewrite below) — Vercel proxies to it server-side.
+const BACKEND_ORIGIN =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "https://bingo.symloop.com";
+
 const nextConfig: NextConfig = {
   // Allow cross-origin dev requests from common LAN ranges + the
   // current network IP so the dev server accepts requests when you
@@ -20,6 +26,15 @@ const nextConfig: NextConfig = {
   // canonical path.
   async rewrites() {
     return [
+      // Same-origin proxy to the Laravel backend. The storefront/admin JS
+      // calls these under our OWN domain (`/bk/...`), and Vercel forwards
+      // them to the backend server-side over a reliable datacenter link.
+      // This fixes mobile networks that can reach Vercel but not the
+      // Hostinger host directly, and removes cross-origin CORS entirely.
+      {
+        source: "/bk/:path*",
+        destination: `${BACKEND_ORIGIN}/api/:path*`,
+      },
       {
         source: "/.well-known/api-catalog",
         destination: "/api/well-known/api-catalog",
