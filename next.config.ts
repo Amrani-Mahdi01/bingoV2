@@ -35,6 +35,14 @@ const nextConfig: NextConfig = {
         source: "/bk/:path*",
         destination: `${BACKEND_ORIGIN}/api/:path*`,
       },
+      // Same-origin proxy for backend media (product photos/videos, logos).
+      // The backend returns relative `/storage/...` URLs; serving them from our
+      // own origin means the browser never hits the backend host directly, so
+      // images load on mobile networks that can't reach it. Cached at the edge.
+      {
+        source: "/storage/:path*",
+        destination: `${BACKEND_ORIGIN}/storage/:path*`,
+      },
       {
         source: "/.well-known/api-catalog",
         destination: "/api/well-known/api-catalog",
