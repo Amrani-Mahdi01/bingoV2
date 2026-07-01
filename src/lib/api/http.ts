@@ -19,6 +19,12 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
+// Cloudflare-fronted backend — reachable on mobile, no Vercel-IP 429. Used for
+// admin calls and uploads (see url resolution in `request`).
+const ADMIN_API = (
+  process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "https://api.bingo-camp.com"
+).replace(/\/$/, "");
+
 const ADMIN_TOKEN_KEY = "bingo-admin-token";
 const CUSTOMER_TOKEN_KEY = "bingo-customer-token";
 
@@ -108,16 +114,21 @@ async function request<T = unknown>(
   const { method = "GET", body, formData, auth = "admin", headers = {}, signal } = options;
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  // Customer-facing calls go through the same-origin `/bk` proxy (next.config
-  // rewrite) so they work on mobile networks that can't reach the backend host
-  // directly. Admin calls (/api/admin/*) and uploads stay DIRECT: the admin
-  // dashboard fires ~15 calls at once and that burst tripped the proxy's rate
-  // limit, and admins are on good connections. SSR / no-window uses direct too.
+  // Admin calls (/api/admin/*) and uploads → the Cloudflare backend
+  // (api.bingo-camp.com): reachable on mobile, and no 429 (Cloudflare passes the
+  // real client IP and doesn't funnel through Vercel's few IPs). Customer reads
+  // → the same-origin `/bk` Vercel proxy (keeps them off the Worker quota).
+  // SSR / no-window → the absolute backend host.
   const isAdmin = normalizedPath.startsWith("/api/admin");
-  const url =
-    typeof window !== "undefined" && !formData && !isAdmin
-      ? `/bk${normalizedPath.replace(/^\/api/, "")}`
-      : `${API_URL}${normalizedPath}`;
+  const inBrowser = typeof window !== "undefined";
+  let url: string;
+  if (!inBrowser) {
+    url = `${API_URL}${normalizedPath}`;
+  } else if (isAdmin || formData) {
+    url = `${ADMIN_API}${normalizedPath}`;
+  } else {
+    url = `/bk${normalizedPath.replace(/^\/api/, "")}`;
+  }
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
     ...headers,

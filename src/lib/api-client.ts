@@ -12,19 +12,28 @@ const HOST = (
 ).replace(/\/$/, "");
 
 /**
+ * Cloudflare-fronted backend. Reachable on mobile (Cloudflare's edge is
+ * reachable on every network) and it doesn't funnel through Vercel's few IPs,
+ * so admin traffic no longer trips Hostinger's per-IP 429.
+ */
+const ADMIN_API = (
+  process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "https://api.bingo-camp.com"
+).replace(/\/$/, "");
+
+/**
  * Where the browser sends each API call.
  *
- * Customer-facing calls (/auth/*, storefront) go through the same-origin
- * `/bk` proxy (next.config rewrite) so they work on mobile networks that
- * can't reach the backend host directly. Admin calls (/admin/*) stay DIRECT
- * to the backend: the admin dashboard fires a burst of calls that tripped the
- * proxy's rate limit, and admins are on good connections anyway. On the server
- * (SSR) there's no same-origin, so always use the absolute backend URL.
+ * - Admin calls (/admin/*) → the Cloudflare backend (api.bingo-camp.com):
+ *   works on mobile, no 429.
+ * - Customer calls (/auth/*, storefront) → the same-origin `/bk` Vercel proxy
+ *   (keeps customer traffic off the Worker's free quota).
+ * - SSR (no window) → the absolute backend host directly.
  */
-const urlFor = (path: string): string =>
-  typeof window !== "undefined" && !path.startsWith("/admin")
-    ? `/bk${path}`
-    : `${HOST}/api${path}`;
+const urlFor = (path: string): string => {
+  if (typeof window === "undefined") return `${HOST}/api${path}`;
+  if (path.startsWith("/admin")) return `${ADMIN_API}/api${path}`;
+  return `/bk${path}`;
+};
 
 /**
  * Master switch for the auth flow.
