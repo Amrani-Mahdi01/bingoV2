@@ -122,10 +122,18 @@ function LoginPageInner() {
             await adminLogin(trimmed, password);
             router.push(safeNext ?? "/admin");
             return;
-          } catch {
-            // Admin login also failed — surface the original customer
-            // error so the UX message stays consistent regardless of
-            // which side actually failed.
+          } catch (adminErr) {
+            // If the admin attempt failed for a NON-credential reason
+            // (network / server unreachable, status 0 or 5xx), surface THAT —
+            // otherwise the customer "invalid credentials" message masks a
+            // real connection problem and looks like a wrong password.
+            if (
+              adminErr instanceof ApiError &&
+              adminErr.status !== 422 &&
+              adminErr.status !== 401
+            ) {
+              throw adminErr;
+            }
             throw customerErr;
           }
         }
