@@ -35,13 +35,13 @@ const nextConfig: NextConfig = {
         source: "/bk/:path*",
         destination: `${BACKEND_ORIGIN}/api/:path*`,
       },
-      // Same-origin proxy for backend media (product photos/videos, logos).
-      // The backend returns relative `/storage/...` URLs; serving them from our
-      // own origin means the browser never hits the backend host directly, so
-      // images load on mobile networks that can't reach it. Cached at the edge.
+      // Media proxy — route through the Cloudflare backend (api.bingo-camp.com)
+      // instead of straight to Hostinger. Otherwise every image funnels through
+      // Vercel's few IPs and trips Hostinger's per-IP 429 (Cloudflare spreads
+      // the load + caches at the edge, and Vercel caches the response too).
       {
         source: "/storage/:path*",
-        destination: `${BACKEND_ORIGIN}/storage/:path*`,
+        destination: `https://api.bingo-camp.com/storage/:path*`,
       },
       {
         source: "/.well-known/api-catalog",
