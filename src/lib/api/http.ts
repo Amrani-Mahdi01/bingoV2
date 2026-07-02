@@ -114,21 +114,14 @@ async function request<T = unknown>(
   const { method = "GET", body, formData, auth = "admin", headers = {}, signal } = options;
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  // Admin calls (/api/admin/*) and uploads → the Cloudflare backend
-  // (api.bingo-camp.com): reachable on mobile, and no 429 (Cloudflare passes the
-  // real client IP and doesn't funnel through Vercel's few IPs). Customer reads
-  // → the same-origin `/bk` Vercel proxy (keeps them off the Worker quota).
-  // SSR / no-window → the absolute backend host.
-  const isAdmin = normalizedPath.startsWith("/api/admin");
+  // ALL browser calls (customer + admin + uploads) → the Cloudflare backend
+  // (api.bingo-camp.com): each visitor connects from their own IP (real IP
+  // passed to Laravel) and it doesn't funnel through Vercel's few egress IPs,
+  // so no Hostinger per-IP 429. SSR / no-window → the absolute backend host.
   const inBrowser = typeof window !== "undefined";
-  let url: string;
-  if (!inBrowser) {
-    url = `${API_URL}${normalizedPath}`;
-  } else if (isAdmin || formData) {
-    url = `${ADMIN_API}${normalizedPath}`;
-  } else {
-    url = `/bk${normalizedPath.replace(/^\/api/, "")}`;
-  }
+  const url = inBrowser
+    ? `${ADMIN_API}${normalizedPath}`
+    : `${API_URL}${normalizedPath}`;
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
     ...headers,

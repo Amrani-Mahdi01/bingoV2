@@ -21,19 +21,16 @@ const ADMIN_API = (
 ).replace(/\/$/, "");
 
 /**
- * Where the browser sends each API call.
- *
- * - Admin calls (/admin/*) → the Cloudflare backend (api.bingo-camp.com):
- *   works on mobile, no 429.
- * - Customer calls (/auth/*, storefront) → the same-origin `/bk` Vercel proxy
- *   (keeps customer traffic off the Worker's free quota).
- * - SSR (no window) → the absolute backend host directly.
+ * Where the browser sends each API call. ALL browser traffic (customer AND
+ * admin) goes through the Cloudflare backend (api.bingo-camp.com): each visitor
+ * hits it from their own IP (real IP passed to Laravel) and it doesn't funnel
+ * through Vercel's few egress IPs, so no Hostinger per-IP 429. SSR (no window)
+ * talks to the backend host directly.
  */
-const urlFor = (path: string): string => {
-  if (typeof window === "undefined") return `${HOST}/api${path}`;
-  if (path.startsWith("/admin")) return `${ADMIN_API}/api${path}`;
-  return `/bk${path}`;
-};
+const urlFor = (path: string): string =>
+  typeof window !== "undefined"
+    ? `${ADMIN_API}/api${path}`
+    : `${HOST}/api${path}`;
 
 /**
  * Master switch for the auth flow.
