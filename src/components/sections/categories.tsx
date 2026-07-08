@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
  * Categories grid — colorful icon tiles fed by /api/categories via the
  * SiteCategoriesProvider (server-seeded in the root layout). Renders
  * the top-level categories the admin has set up — empty when there
- * are none. Cap the list to 9 tiles on mobile/tablet and 8 on lg+ to
- * keep a clean row layout.
+ * are none. Cap the list to 12 tiles laid out as two clean rows —
+ * 6 per row on md/lg, 3 per row on mobile.
  */
 export function Categories() {
   const { t } = useLanguage();
@@ -23,7 +23,7 @@ export function Categories() {
   // Don't render the section at all if the admin hasn't configured any
   // categories yet — better than an empty grid + lonely header.
   if (list.length === 0) return null;
-  const tiles = list.slice(0, 9);
+  const tiles = list.slice(0, 12);
   return (
     <section
       aria-labelledby="categories-title"
@@ -38,15 +38,9 @@ export function Categories() {
           ctaHref="/catalogue"
         />
 
-        <ul className="mt-10 grid grid-cols-3 gap-4 sm:gap-5 md:mt-12 md:grid-cols-6 md:gap-5 lg:grid-cols-8">
-          {tiles.map((c, i) => (
-            <li
-              key={c.slug}
-              // 9 tiles total on mobile/tablet (3×3 / 6+3), but on
-              // lg+ the grid is 8 cols wide so the 9th tile is
-              // hidden to keep a clean single row.
-              className={i === 8 ? "lg:hidden" : undefined}
-            >
+        <ul className="mt-10 grid grid-cols-3 gap-4 sm:gap-5 md:mt-12 md:grid-cols-6 md:gap-5 lg:grid-cols-6">
+          {tiles.map((c) => (
+            <li key={c.slug}>
               <CategoryCard category={c} />
             </li>
           ))}
