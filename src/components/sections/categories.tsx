@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
  * Categories grid — colorful icon tiles fed by /api/categories via the
  * SiteCategoriesProvider (server-seeded in the root layout). Renders
  * the top-level categories the admin has set up — empty when there
- * are none. Cap the list to 12 tiles laid out as two clean rows —
- * 6 per row on md/lg, 3 per row on mobile.
+ * are none. Cap the list to 12 tiles — 3 per row on mobile, 6 on md,
+ * 8 on lg (wraps to 8 + 4) so tile/icon size matches the classic row.
  */
 export function Categories() {
   const { t } = useLanguage();
@@ -38,7 +38,7 @@ export function Categories() {
           ctaHref="/catalogue"
         />
 
-        <ul className="mt-10 grid grid-cols-3 gap-4 sm:gap-5 md:mt-12 md:grid-cols-6 md:gap-5 lg:grid-cols-6">
+        <ul className="mt-10 grid grid-cols-3 gap-4 sm:gap-5 md:mt-12 md:grid-cols-6 md:gap-5 lg:grid-cols-8">
           {tiles.map((c) => (
             <li key={c.slug}>
               <CategoryCard category={c} />
