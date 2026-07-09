@@ -12,25 +12,12 @@ const HOST = (
 ).replace(/\/$/, "");
 
 /**
- * Cloudflare-fronted backend. Reachable on mobile (Cloudflare's edge is
- * reachable on every network) and it doesn't funnel through Vercel's few IPs,
- * so admin traffic no longer trips Hostinger's per-IP 429.
+ * Where every API call goes — browser AND server alike — straight to the
+ * Hostinger backend (NEXT_PUBLIC_API_URL). No Cloudflare/Vercel proxy in
+ * front: each visitor connects from their own IP (so no per-IP 429), and
+ * CORS is handled by the backend (FRONTEND_URLS allows the storefront origin).
  */
-const ADMIN_API = (
-  process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "https://api.bingo-camp.com"
-).replace(/\/$/, "");
-
-/**
- * Where the browser sends each API call. ALL browser traffic (customer AND
- * admin) goes through the Cloudflare backend (api.bingo-camp.com): each visitor
- * hits it from their own IP (real IP passed to Laravel) and it doesn't funnel
- * through Vercel's few egress IPs, so no Hostinger per-IP 429. SSR (no window)
- * talks to the backend host directly.
- */
-const urlFor = (path: string): string =>
-  typeof window !== "undefined"
-    ? `${ADMIN_API}/api${path}`
-    : `${HOST}/api${path}`;
+const urlFor = (path: string): string => `${HOST}/api${path}`;
 
 /**
  * Master switch for the auth flow.
