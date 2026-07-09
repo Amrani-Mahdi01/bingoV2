@@ -4,6 +4,7 @@ import {
   type ProductVariant,
 } from "@/lib/products";
 import { serverFetch } from "@/lib/server/server-fetch";
+import { mediaUrl } from "@/lib/media";
 
 /**
  * Server-side fetch of a single product by slug, projected to the
@@ -96,7 +97,7 @@ function adapt(p: ApiProductPayload): Product {
       if (!!b.isPrimary !== !!a.isPrimary) return b.isPrimary ? 1 : -1;
       return (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
     })
-    .map((img) => img.url);
+    .map((img) => mediaUrl(img.url));
 
   const descFr = p.descriptionFr ?? p.descriptionShortFr ?? "";
   const descAr = p.descriptionAr ?? p.descriptionShortAr ?? "";

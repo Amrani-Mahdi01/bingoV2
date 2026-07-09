@@ -10,6 +10,8 @@
  *   site.logo_radius    — border-radius in px (0..48, 9999 = pill, default 0)
  */
 
+import { mediaUrl } from "@/lib/media";
+
 export interface SiteBranding {
   logoUrl: string | null;
   logoAltFr: string;
@@ -40,7 +42,7 @@ export function siteBrandingFromSettings(
 ): SiteBranding {
   const logoUrl = typeof map["site.logo"] === "string" ? map["site.logo"] : null;
   return {
-    logoUrl: logoUrl && logoUrl.length > 0 ? logoUrl : null,
+    logoUrl: logoUrl && logoUrl.length > 0 ? mediaUrl(logoUrl) : null,
     logoAltFr:
       (typeof map["site.logo_alt_fr"] === "string" && map["site.logo_alt_fr"]) ||
       SITE_BRANDING_DEFAULTS.logoAltFr,

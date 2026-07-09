@@ -12,6 +12,7 @@ import type { ApiBrand } from "@/lib/api/brands";
 import type { ApiCategory } from "@/lib/api/categories";
 import type { ApiProduct } from "@/lib/api/products";
 import type { Brand, Category, Product } from "@/lib/types";
+import { mediaUrl } from "@/lib/media";
 
 export function adaptBrand(b: ApiBrand): Brand {
   return {
@@ -57,7 +58,7 @@ export function adaptProduct(p: ApiProduct): Product {
     stockStatus: p.stockStatus,
     images: p.images.map((img) => ({
       id: img.id,
-      url: img.url,
+      url: mediaUrl(img.url),
       alt: img.altFr ?? "",
       isPrimary: img.isPrimary,
       displayOrder: img.displayOrder,

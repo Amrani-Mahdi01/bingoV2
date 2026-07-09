@@ -20,6 +20,7 @@ import {
   type SiteCategory,
 } from "@/lib/site-categories";
 import { serverFetch } from "@/lib/server/server-fetch";
+import { mediaUrl } from "@/lib/media";
 
 /**
  * Server-side fetch of the public /api/settings map. Next.js dedupes
@@ -233,7 +234,7 @@ export async function getServerSiteHome(): Promise<SiteHome> {
         slug: c.slug,
         nameFr: c.nameFr,
         nameAr: c.nameAr,
-        image: c.image ?? "",
+        image: mediaUrl(c.image),
         price: null,
         href: `/catalogue?category=${encodeURIComponent(c.slug)}`,
       });
@@ -354,7 +355,7 @@ function productToHeroSlot(p: {
     slug: p.slug,
     nameFr: p.nameFr,
     nameAr: p.nameAr,
-    image: p.images?.[0]?.url ?? "",
+    image: mediaUrl(p.images?.[0]?.url),
     price: p.price,
     oldPrice: p.oldPrice ?? null,
     brand: p.brand?.name ?? undefined,
@@ -399,7 +400,7 @@ export async function getServerCategories(): Promise<SiteCategories> {
       slug: c.slug,
       nameFr: c.nameFr,
       nameAr: c.nameAr,
-      image: c.image,
+      image: mediaUrl(c.image),
       icon: c.icon,
       productCount: c.productCount,
       children: (c.children ?? []).map((sc) => ({
