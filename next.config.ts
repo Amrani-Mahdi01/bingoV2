@@ -35,14 +35,13 @@ const nextConfig: NextConfig = {
         source: "/bk/:path*",
         destination: `${BACKEND_ORIGIN}/api/:path*`,
       },
-      // Media proxy — Vercel forwards image requests to the Hostinger backend
-      // server-side and caches them at the edge (product media is immutable).
-      // Going through the rewrite (not the browser) keeps images reachable
-      // even on networks that struggle to hit the backend host directly, and
-      // the edge cache means Hostinger is hit ~once per image — so no per-IP 429.
+      // Media proxy — route through the Cloudflare backend (api.bingo-camp.com)
+      // instead of straight to Hostinger. Otherwise every image funnels through
+      // Vercel's few IPs and trips Hostinger's per-IP 429 (Cloudflare spreads
+      // the load + caches at the edge, and Vercel caches the response too).
       {
         source: "/storage/:path*",
-        destination: `${BACKEND_ORIGIN}/storage/:path*`,
+        destination: `https://api.bingo-camp.com/storage/:path*`,
       },
       {
         source: "/.well-known/api-catalog",

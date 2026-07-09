@@ -19,6 +19,12 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
+// Cloudflare-fronted backend — reachable on mobile, no Vercel-IP 429. Used for
+// admin calls and uploads (see url resolution in `request`).
+const ADMIN_API = (
+  process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "https://api.bingo-camp.com"
+).replace(/\/$/, "");
+
 const ADMIN_TOKEN_KEY = "bingo-admin-token";
 const CUSTOMER_TOKEN_KEY = "bingo-customer-token";
 
@@ -108,10 +114,14 @@ async function request<T = unknown>(
   const { method = "GET", body, formData, auth = "admin", headers = {}, signal } = options;
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  // Every call — browser and server — goes straight to the Hostinger backend
-  // (NEXT_PUBLIC_API_URL). No Cloudflare/Vercel proxy: each visitor hits it
-  // from their own IP (no per-IP 429); CORS is handled by the backend.
-  const url = `${API_URL}${normalizedPath}`;
+  // ALL browser calls (customer + admin + uploads) → the Cloudflare backend
+  // (api.bingo-camp.com): each visitor connects from their own IP (real IP
+  // passed to Laravel) and it doesn't funnel through Vercel's few egress IPs,
+  // so no Hostinger per-IP 429. SSR / no-window → the absolute backend host.
+  const inBrowser = typeof window !== "undefined";
+  const url = inBrowser
+    ? `${ADMIN_API}${normalizedPath}`
+    : `${API_URL}${normalizedPath}`;
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
     ...headers,
