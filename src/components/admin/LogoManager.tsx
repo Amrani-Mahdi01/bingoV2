@@ -12,6 +12,7 @@ import { Small } from "@/components/ui/typography";
 import { HttpError } from "@/lib/api/http";
 import { settingsApi, type SettingsMap } from "@/lib/api/settings";
 import { cn } from "@/lib/utils";
+import { mediaUrl } from "@/lib/media";
 
 function extractMessage(err: unknown, fallback: string): string {
   if (err instanceof HttpError) {
@@ -203,7 +204,7 @@ export function LogoManager() {
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={logoUrl}
+              src={mediaUrl(logoUrl)}
               alt="Logo BINGO"
               className="max-h-full max-w-full object-contain"
             />
@@ -325,7 +326,7 @@ export function LogoManager() {
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={logoUrl}
+                src={mediaUrl(logoUrl)}
                 alt="Aperçu logo"
                 style={{
                   height: `${height}px`,

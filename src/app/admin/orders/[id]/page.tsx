@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { mediaUrl } from "@/lib/media";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -517,7 +518,7 @@ export default function OrderDetailPage() {
                       {line.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={line.image}
+                          src={mediaUrl(line.image)}
                           alt=""
                           className="absolute inset-0 size-full object-cover"
                         />

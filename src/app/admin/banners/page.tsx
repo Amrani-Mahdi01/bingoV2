@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { mediaUrl } from "@/lib/media";
 import {
   Check,
   ChevronsUpDown,
@@ -589,7 +590,7 @@ function Thumb({
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          src={mediaUrl(src)}
           alt=""
           className="absolute inset-0 size-full object-cover"
         />

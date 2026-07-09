@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { mediaUrl } from "@/lib/media";
 import {
   ArrowDown,
   ArrowUp,
@@ -668,7 +669,7 @@ function CategoryRow({
             {category.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={category.image}
+                src={mediaUrl(category.image)}
                 alt={category.nameFr}
                 className="absolute inset-0 size-full object-contain p-2"
               />
@@ -1150,7 +1151,7 @@ function CategoryEditorTrigger({
                   {image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={image}
+                      src={mediaUrl(image)}
                       alt="Aperçu"
                       className="absolute inset-0 size-full object-cover"
                     />

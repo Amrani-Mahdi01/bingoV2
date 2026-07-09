@@ -5,8 +5,13 @@ import * as React from "react";
 import { adminToken, HttpError } from "@/lib/api/http";
 import { ordersApi } from "@/lib/api/orders";
 
+// Admin live-orders SSE stream. Uses the Cloudflare-fronted host (like the
+// rest of admin) so it's reachable on Algerian mobile — the direct
+// bingo.symloop.com host times out there. Falls back to polling if the
+// stream can't be established.
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_ADMIN_API_URL?.replace(/\/$/, "") ??
+  "https://api.bingo-camp.com";
 
 /** Window event consumers can dispatch to force an immediate
  *  refresh of the pending-orders count. Also fired by the SSE handler
