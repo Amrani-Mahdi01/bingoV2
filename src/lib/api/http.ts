@@ -108,18 +108,32 @@ interface RequestOptions {
 }
 
 /**
- * Resilience knobs — mirrors the customer wrapper (`api-client.ts`). The path
- * from the browser → Cloudflare edge → Hostinger LiteSpeed occasionally drops a
- * single connection, which the browser surfaces as a bare "Failed to fetch". A
- * lone `fetch()` turns that transient blip into a hard admin-panel error even
- * though a refresh works. So we give each attempt a hard timeout and retry the
- * transient failures — network drops, timeouts, and 502/503/504 gateway blips.
- * We never retry a real HTTP answer (401/403/404/422/429): those are decisions,
- * not glitches.
+ * Resilience knobs.
+ *
+ * The browser reaches the backend through the Cloudflare edge
+ * (api.bingo-camp.com). That path is normally fast, but the connection to the
+ * edge itself intermittently hangs or fails the TLS handshake (packet loss /
+ * flaky IPv6 route to the nearest colo) — the classic "sometimes it works,
+ * sometimes it doesn't". So instead of a single host we keep an ordered list
+ * [Cloudflare, direct origin] and fail OVER to the origin when the edge drops:
+ * both accept the same CORS, so either can serve the call. Each attempt also
+ * gets a hard timeout so a hung connection can't stall the panel forever.
+ *
+ * Retry policy — we never retry a real HTTP answer (401/403/404/422/429: those
+ * are decisions). We retry:
+ *  - a gateway blip (502/503/504): the app didn't process it → safe for any method.
+ *  - a network drop / timeout: AMBIGUOUS (the request may have landed), so we
+ *    only repeat it for idempotent methods (GET/PUT/PATCH/DELETE). A POST fails
+ *    fast to avoid a double-submit (e.g. creating a product twice); the admin
+ *    retries manually.
+ * Uploads (multipart) run ONCE with a long timeout — they're large and
+ * non-idempotent, so auto-retrying would re-send the whole file.
  */
 const MAX_ATTEMPTS = 3;
-const TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 10_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
+const IDEMPOTENT_METHODS = new Set(["GET", "PUT", "PATCH", "DELETE"]);
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -130,14 +144,15 @@ async function request<T = unknown>(
   const { method = "GET", body, formData, auth = "admin", headers = {}, signal: externalSignal } = options;
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  // ALL browser calls (customer + admin + uploads) → the Cloudflare backend
-  // (api.bingo-camp.com): each visitor connects from their own IP (real IP
-  // passed to Laravel) and it doesn't funnel through Vercel's few egress IPs,
-  // so no Hostinger per-IP 429. SSR / no-window → the absolute backend host.
+  // Browser: try the Cloudflare-fronted host first, then fall back to the direct
+  // origin (deduped — in dev both env vars point at the same local backend, so
+  // this collapses to a single host and failover is a no-op). SSR/no-window uses
+  // the origin directly. Each visitor connects from their own IP either way.
   const inBrowser = typeof window !== "undefined";
-  const url = inBrowser
-    ? `${ADMIN_API}${normalizedPath}`
-    : `${API_URL}${normalizedPath}`;
+  const hosts = inBrowser
+    ? Array.from(new Set([ADMIN_API, API_URL]))
+    : [API_URL];
+
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
     ...headers,
@@ -157,7 +172,16 @@ async function request<T = unknown>(
     payload = JSON.stringify(body);
   }
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  const isUpload = !!formData;
+  const idempotent = IDEMPOTENT_METHODS.has(method);
+  const timeoutMs = isUpload ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+  const maxAttempts = isUpload ? 1 : MAX_ATTEMPTS;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Alternate hosts across attempts: Cloudflare → origin → Cloudflare. A
+    // hung edge connection thus fails over to the direct origin next try.
+    const url = `${hosts[(attempt - 1) % hosts.length]}${normalizedPath}`;
+
     // Per-attempt abort: our own timeout, also chained to any caller signal.
     const controller = new AbortController();
     const onExternalAbort = () => controller.abort();
@@ -165,7 +189,7 @@ async function request<T = unknown>(
       if (externalSignal.aborted) controller.abort();
       else externalSignal.addEventListener("abort", onExternalAbort, { once: true });
     }
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     let res: Response;
     try {
@@ -178,9 +202,10 @@ async function request<T = unknown>(
     } catch (err) {
       // The caller cancelled on purpose (navigated away) — don't retry.
       if (externalSignal?.aborted) throw err;
-      // Network drop or our timeout fired: retry with backoff, else give up.
-      if (attempt < MAX_ATTEMPTS) {
-        await sleep(attempt * 500);
+      // Network drop or our timeout fired. Only repeat when it's safe to (an
+      // idempotent method); otherwise surface it so a POST can't double-submit.
+      if (idempotent && attempt < maxAttempts) {
+        await sleep(attempt * 400);
         continue;
       }
       throw new HttpError(
@@ -193,9 +218,9 @@ async function request<T = unknown>(
       externalSignal?.removeEventListener("abort", onExternalAbort);
     }
 
-    // Transient gateway error from LiteSpeed — retry rather than surface it.
-    if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_ATTEMPTS) {
-      await sleep(attempt * 500);
+    // Transient gateway error (didn't reach the app) — retry, failing over.
+    if (RETRYABLE_STATUS.has(res.status) && attempt < maxAttempts) {
+      await sleep(attempt * 400);
       continue;
     }
 
