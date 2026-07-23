@@ -144,14 +144,26 @@ async function request<T = unknown>(
   const { method = "GET", body, formData, auth = "admin", headers = {}, signal: externalSignal } = options;
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  // Browser: try the Cloudflare-fronted host first, then fall back to the direct
-  // origin (deduped — in dev both env vars point at the same local backend, so
-  // this collapses to a single host and failover is a no-op). SSR/no-window uses
-  // the origin directly. Each visitor connects from their own IP either way.
+  // Host selection:
+  //  - SSR / no-window → the origin directly (Vercel→Hostinger is fine).
+  //  - Browser ADMIN → try Cloudflare first, then FAIL OVER to the direct
+  //    origin when the edge drops (admins are usually on WiFi/desktop, which
+  //    CAN reach the origin — so the fallback actually works).
+  //  - Browser CUSTOMER / public → Cloudflare ONLY. Algerian mobile (Ooredoo/
+  //    Djezzy/Mobilis) canNOT reach the Hostinger origin at all — that's the
+  //    whole reason Cloudflare fronts it — so an origin fallback would just be
+  //    a doomed ~10s timeout mid-checkout. Never route shoppers there.
+  //    (Deduped: in dev both env vars point at the same local backend, so the
+  //    admin list collapses to one host and failover is a harmless no-op.)
   const inBrowser = typeof window !== "undefined";
-  const hosts = inBrowser
-    ? Array.from(new Set([ADMIN_API, API_URL]))
-    : [API_URL];
+  let hosts: string[];
+  if (!inBrowser) {
+    hosts = [API_URL];
+  } else if (auth === "admin") {
+    hosts = Array.from(new Set([ADMIN_API, API_URL]));
+  } else {
+    hosts = [ADMIN_API];
+  }
 
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
