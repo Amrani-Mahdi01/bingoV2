@@ -108,6 +108,40 @@ export interface ApiOrder {
   updatedAt: string | null;
 }
 
+/** One line in an admin order edit. Snapshot fields (name/sku/image/variant)
+ *  come straight from the loaded order for existing lines, or from the product
+ *  picker for freshly-added ones. The backend recomputes every total. */
+export interface UpdateOrderLineInput {
+  productId: string | null;
+  variantId: number | null;
+  productName: string;
+  sku: string;
+  image: string | null;
+  variant: string | null;
+  quantity: number;
+  unitPrice: number;
+}
+
+/** Payload sent to PUT /api/admin/orders/{id} (full admin edit). */
+export interface UpdateOrderPayload {
+  customer: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email?: string | null;
+  };
+  shipping: {
+    wilayaId: string;
+    commune: string;
+    address?: string | null;
+    deliveryType: "home" | "stopdesk";
+    notes?: string | null;
+  };
+  /** Manual delivery-fee override. Null/omitted bills the wilaya's rate. */
+  shippingFee?: number | null;
+  lines: UpdateOrderLineInput[];
+}
+
 /** Light row returned by /api/admin/orders. */
 export interface ApiOrderRow {
   id: string;
@@ -171,6 +205,13 @@ export const ordersApi = {
   get(id: string): Promise<ApiOrder> {
     return http
       .get<SingleResponse>(`/api/admin/orders/${id}`, { auth: "admin" })
+      .then((r) => r.data);
+  },
+
+  /** Admin — full edit of an order's lines, delivery, and customer details. */
+  update(id: string, payload: UpdateOrderPayload): Promise<ApiOrder> {
+    return http
+      .put<SingleResponse>(`/api/admin/orders/${id}`, payload, { auth: "admin" })
       .then((r) => r.data);
   },
 

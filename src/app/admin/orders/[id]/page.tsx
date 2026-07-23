@@ -12,6 +12,7 @@ import {
   History,
   MapPin,
   Package,
+  Pencil,
   Printer,
   RefreshCw,
   Send,
@@ -24,6 +25,7 @@ import {
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { OrderEditSheet } from "@/components/admin/OrderEditSheet";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -84,6 +86,7 @@ export default function OrderDetailPage() {
     "loading" | "ready" | "notfound" | "error"
   >("loading");
   const [busy, setBusy] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
   const [zrBusy, setZrBusy] = React.useState<null | "ship" | "label" | "detach" | "sync">(null);
 
   const load = React.useCallback(async () => {
@@ -385,6 +388,18 @@ export default function OrderDetailPage() {
           <span className="hidden sm:inline">Toutes les commandes</span>
         </Link>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => setEditOpen(true)}
+            disabled={busy}
+            aria-label="Modifier la commande"
+            className="h-8 gap-1 px-2 sm:h-9 sm:gap-1.5 sm:px-3"
+          >
+            <Pencil className="size-3.5" />
+            <span className="hidden sm:inline">Modifier</span>
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -844,6 +859,16 @@ export default function OrderDetailPage() {
           </section>
         </div>
       </div>
+
+      <OrderEditSheet
+        order={order}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={(updated) => {
+          setOrder(updated);
+          refreshPendingOrders();
+        }}
+      />
     </div>
   );
 }

@@ -20,10 +20,10 @@ import { cn } from "@/lib/utils";
  * router push is cleaner).
  *
  * When the product is out of stock (top-level stock = 0, tracked, no
- * backorder) the button renders disabled with an "Épuisé" label so
- * customers can't even land on the detail page to try to add a sold-
- * out item. Variants override at the detail page so we only block
- * here when the no-variant rule says so.
+ * backorder) the button renders disabled with an "Épuisé" label — the
+ * product stays visible in the catalogue, it just can't be ordered.
+ * Variants override at the detail page so we only block here when the
+ * no-variant rule says so.
  */
 export function AddToCartButton({
   product,

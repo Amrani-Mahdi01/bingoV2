@@ -107,11 +107,27 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * Resilience knobs — mirrors the customer wrapper (`api-client.ts`). The path
+ * from the browser → Cloudflare edge → Hostinger LiteSpeed occasionally drops a
+ * single connection, which the browser surfaces as a bare "Failed to fetch". A
+ * lone `fetch()` turns that transient blip into a hard admin-panel error even
+ * though a refresh works. So we give each attempt a hard timeout and retry the
+ * transient failures — network drops, timeouts, and 502/503/504 gateway blips.
+ * We never retry a real HTTP answer (401/403/404/422/429): those are decisions,
+ * not glitches.
+ */
+const MAX_ATTEMPTS = 3;
+const TIMEOUT_MS = 15_000;
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 async function request<T = unknown>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = "GET", body, formData, auth = "admin", headers = {}, signal } = options;
+  const { method = "GET", body, formData, auth = "admin", headers = {}, signal: externalSignal } = options;
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   // ALL browser calls (customer + admin + uploads) → the Cloudflare backend
@@ -141,26 +157,70 @@ async function request<T = unknown>(
     payload = JSON.stringify(body);
   }
 
-  const res = await fetch(url, { method, headers: finalHeaders, body: payload, signal });
-
-  // Try to parse JSON, fall back to text for HTML/empty responses.
-  let parsed: unknown = null;
-  const text = await res.text();
-  if (text) {
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      parsed = text;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Per-attempt abort: our own timeout, also chained to any caller signal.
+    const controller = new AbortController();
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort();
+      else externalSignal.addEventListener("abort", onExternalAbort, { once: true });
     }
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method,
+        headers: finalHeaders,
+        body: payload,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      // The caller cancelled on purpose (navigated away) — don't retry.
+      if (externalSignal?.aborted) throw err;
+      // Network drop or our timeout fired: retry with backoff, else give up.
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(attempt * 500);
+        continue;
+      }
+      throw new HttpError(
+        0,
+        null,
+        "Connexion au serveur impossible. Vérifiez votre connexion internet et réessayez.",
+      );
+    } finally {
+      clearTimeout(timer);
+      externalSignal?.removeEventListener("abort", onExternalAbort);
+    }
+
+    // Transient gateway error from LiteSpeed — retry rather than surface it.
+    if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_ATTEMPTS) {
+      await sleep(attempt * 500);
+      continue;
+    }
+
+    // Try to parse JSON, fall back to text for HTML/empty responses.
+    let parsed: unknown = null;
+    const text = await res.text();
+    if (text) {
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        parsed = text;
+      }
+    }
+
+    if (!res.ok) {
+      const message =
+        (parsed as { message?: string } | null)?.message ?? `HTTP ${res.status}`;
+      throw new HttpError(res.status, parsed, message);
+    }
+
+    return parsed as T;
   }
 
-  if (!res.ok) {
-    const message =
-      (parsed as { message?: string } | null)?.message ?? `HTTP ${res.status}`;
-    throw new HttpError(res.status, parsed, message);
-  }
-
-  return parsed as T;
+  // Unreachable: the final attempt always returns or throws above.
+  throw new HttpError(0, null, "Le serveur est momentanément indisponible. Réessayez.");
 }
 
 export const http = {
