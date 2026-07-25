@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
+import { PageLoader } from "@/components/layout/page-loader";
 import { TentOverlay } from "@/components/layout/tent-overlay";
 import { Toaster } from "@/components/ui/sonner";
 import { AdminAuthProvider } from "@/lib/admin-auth";
@@ -144,6 +145,9 @@ export default async function RootLayout({
       className={`${dmSans.variable} ${cairo.variable} ${jetbrainsMono.variable} h-full scroll-smooth antialiased`}
     >
       <body className="min-h-full flex flex-col bg-cream text-wood-800">
+        {/* First-load splash — fades out once the page is ready (hard-capped
+            so a slow mobile connection can never trap it on screen). */}
+        <PageLoader />
         {/* Site-wide structured data — Organization, the physical Sétif
             store (LocalBusiness) built from live admin contact info, and
             the WebSite + on-site search action. */}

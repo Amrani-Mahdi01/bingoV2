@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 import type { Category, Product } from "@/lib/types";
 
 interface LinkPickerProps {
-  /** Currently selected destination href, e.g. "/catalog/sacs-a-dos". */
+  /** Currently selected destination href, e.g. "/catalogue?category=sacs-a-dos". */
   value: string;
   onChange: (href: string) => void;
   className?: string;
@@ -53,19 +53,19 @@ const QUICK_FILTERS = [
   { id: "catalog", href: routes.catalog, label: "Catalogue complet", icon: Layers },
   {
     id: "promo",
-    href: `${routes.catalog}?promoOnly=true`,
+    href: `${routes.catalog}?promo=1`,
     label: "Promotions en cours",
     icon: Sparkles,
   },
   {
     id: "new",
-    href: `${routes.catalog}?sort=new`,
+    href: `${routes.catalog}?sort=newest`,
     label: "Nouveautés",
     icon: Tag,
   },
   {
     id: "bestseller",
-    href: `${routes.catalog}?sort=bestseller`,
+    href: `${routes.catalog}?sort=popular`,
     label: "Meilleures ventes",
     icon: Star,
   },
@@ -115,14 +115,14 @@ export function LinkPicker({
     const filter = QUICK_FILTERS.find((f) => f.href === value);
     if (filter) return filter.label;
     if (!data) return value;
-    // Category / subcategory
-    const catMatch = value.match(/^\/catalog\/([^?]+)/);
+    // Category / subcategory — links use `/catalogue?category=<slug>`.
+    const catMatch = value.match(/^\/catalogue\?category=([^&]+)/);
     if (catMatch) {
       const cat = data.categories.find((c) => c.slug === catMatch[1]);
       if (cat) return `Catégorie : ${cat.name}`;
     }
     // Product
-    const prodMatch = value.match(/^\/product\/([^?]+)/);
+    const prodMatch = value.match(/^\/produit\/([^?]+)/);
     if (prodMatch) {
       const p = data.products.find((p) => p.slug === prodMatch[1]);
       if (p) return `Produit : ${p.name}`;

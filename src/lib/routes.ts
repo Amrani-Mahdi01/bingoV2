@@ -9,8 +9,10 @@
 export const routes = {
   // ---------- Public storefront ----------
   home: "/",
-  catalog: "/catalog",
-  category: (slug: string) => `/catalog/${slug}` as const,
+  catalog: "/catalogue",
+  // The catalogue is a single page that filters by query param — there is no
+  // `/catalogue/[slug]` route — so a category link is `?category=<slug>`.
+  category: (slug: string) => `/catalogue?category=${slug}` as const,
   product: (slug: string) => `/produit/${slug}` as const,
   compare: "/compare",
   cart: "/cart",
@@ -86,7 +88,7 @@ export interface NavLink {
 
 export const mainNav: NavLink[] = [
   { label: "Catalogue", href: routes.catalog },
-  { label: "Promotions", href: `${routes.catalog}?promoOnly=true` },
+  { label: "Promotions", href: `${routes.catalog}?promo=1` },
   { label: "À propos", href: routes.about },
   { label: "Contact", href: routes.contact },
 ];
@@ -94,9 +96,9 @@ export const mainNav: NavLink[] = [
 export const footerNav = {
   boutique: [
     { label: "Toutes catégories", href: routes.catalog },
-    { label: "Nouveautés", href: `${routes.catalog}?sort=new` },
-    { label: "Promotions", href: `${routes.catalog}?promoOnly=true` },
-    { label: "Meilleures ventes", href: `${routes.catalog}?sort=bestseller` },
+    { label: "Nouveautés", href: `${routes.catalog}?sort=newest` },
+    { label: "Promotions", href: `${routes.catalog}?promo=1` },
+    { label: "Meilleures ventes", href: `${routes.catalog}?sort=popular` },
   ] satisfies NavLink[],
   aide: [
     { label: "Livraison", href: routes.delivery },
