@@ -121,6 +121,28 @@ export const productsApi = {
   },
 
   /**
+   * Fetches the ENTIRE admin catalogue by walking every page.
+   *
+   * The backend caps `perPage` at 100, so a single `listAll` call can only
+   * ever return the newest 100 products. Callers that filter/search the full
+   * list client-side (e.g. the banner picker) must page through all of them,
+   * otherwise products beyond the newest 100 are invisible to the search.
+   */
+  async listEvery(
+    params: { q?: string; categoryId?: string; brandId?: string } = {},
+  ): Promise<ApiProduct[]> {
+    const perPage = 100;
+    const first = await this.listAll({ ...params, page: 1, perPage });
+    const all = [...first.data];
+    const lastPage = first.meta?.lastPage ?? 1;
+    for (let page = 2; page <= lastPage; page += 1) {
+      const res = await this.listAll({ ...params, page, perPage });
+      all.push(...res.data);
+    }
+    return all;
+  },
+
+  /**
    * Public product search — hits `GET /api/products?q=…` (no auth).
    * Used by the storefront header's live search dropdown.
    * Server-side filters by `name_fr`, `name_ar`, `sku`, and brand name.

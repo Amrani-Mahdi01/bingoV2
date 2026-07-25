@@ -138,13 +138,13 @@ export default function BannersPage() {
     let cancelled = false;
     setLoading(true);
     Promise.all([
-      productsApi.listAll({ perPage: 100 }),
+      productsApi.listEvery(),
       categoriesApi.listAll(),
       settingsApi.listAll(),
     ])
-      .then(([listRes, cats, map]) => {
+      .then(([allProducts, cats, map]) => {
         if (cancelled) return;
-        setProducts(listRes.data);
+        setProducts(allProducts);
         // Flatten the parent/child tree so sub-categories are pickable too.
         const flat: ApiCategory[] = [];
         for (const top of cats) {
