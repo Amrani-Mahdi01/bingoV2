@@ -77,23 +77,35 @@ export function ProductDetails({
      color-only products) — pickers render only for the axis present. */
   const variants = product.variants ?? [];
   const hasVariants = variants.length > 0;
-  // Unique color list, preserving display order. A variant with no
-  // colorNameFr is treated as a single "—" bucket (sizes-only flow).
+  // Stable identity for a colour: its name when it has one, otherwise its
+  // hex. The colour name is optional — an unnamed colour must still be
+  // pickable and show as a swatch, so we never key off the name alone.
+  const colorKeyOf = React.useCallback((v: ProductVariant) => {
+    const name = (v.colorNameFr ?? "").trim();
+    return name || v.colorHex || "";
+  }, []);
+
+  // Unique colour list, preserving display order. Variants carrying no
+  // colour at all (neither name nor hex) are skipped — that's the
+  // sizes-only flow, where the colour picker shouldn't appear.
   const colorOptions = React.useMemo(() => {
     const seen = new Set<string>();
-    const out: { hex: string | null; nameFr: string; nameAr: string }[] = [];
+    const out: { key: string; hex: string | null; nameFr: string; nameAr: string }[] = [];
     for (const v of variants) {
-      const key = (v.colorNameFr ?? "").toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const key = colorKeyOf(v);
+      if (!key) continue;
+      const dedup = key.toLowerCase();
+      if (seen.has(dedup)) continue;
+      seen.add(dedup);
       out.push({
+        key,
         hex: v.colorHex,
         nameFr: v.colorNameFr ?? "",
         nameAr: v.colorNameAr ?? v.colorNameFr ?? "",
       });
     }
-    return out.filter((c) => c.nameFr.length > 0);
-  }, [variants]);
+    return out;
+  }, [variants, colorKeyOf]);
 
   const sizeOptions = React.useMemo(() => {
     const seen = new Set<string>();
@@ -108,17 +120,17 @@ export function ProductDetails({
   }, [variants]);
 
   const [selectedColor, setSelectedColor] = React.useState<string>(
-    () => colorOptions[0]?.nameFr ?? "",
+    () => colorOptions[0]?.key ?? "",
   );
 
   /** Sizes actually available for the currently selected color. */
   const sizesForColor = React.useMemo(() => {
     if (!selectedColor) return sizeOptions;
     return variants
-      .filter((v) => (v.colorNameFr ?? "") === selectedColor)
+      .filter((v) => colorKeyOf(v) === selectedColor)
       .map((v) => v.sizeLabel ?? "")
       .filter((s) => s.length > 0);
-  }, [selectedColor, variants, sizeOptions]);
+  }, [selectedColor, variants, sizeOptions, colorKeyOf]);
 
   const [selectedSize, setSelectedSize] = React.useState<string>(
     () => sizesForColor[0] ?? "",
@@ -140,11 +152,11 @@ export function ProductDetails({
     return (
       variants.find(
         (v) =>
-          (selectedColor ? (v.colorNameFr ?? "") === selectedColor : true) &&
+          (selectedColor ? colorKeyOf(v) === selectedColor : true) &&
           (selectedSize ? (v.sizeLabel ?? "") === selectedSize : true),
       ) ?? null
     );
-  }, [hasVariants, variants, selectedColor, selectedSize]);
+  }, [hasVariants, variants, selectedColor, selectedSize, colorKeyOf]);
 
   // Effective price = base + variant delta. Falls back to product.price
   // when no variant is selected (no variants on this product).
@@ -365,23 +377,32 @@ export function ProductDetails({
                   <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-wood-700">
                     {lang === "ar" ? "اللون" : "Couleur"}
                   </span>
-                  {selectedColor ? (
-                    <span className="font-display text-[12px] font-semibold text-forest-900">
-                      {lang === "ar"
-                        ? colorOptions.find((c) => c.nameFr === selectedColor)?.nameAr ?? selectedColor
-                        : selectedColor}
-                    </span>
-                  ) : null}
+                  {(() => {
+                    // Show the colour's name only when it has one — unnamed
+                    // colours are represented by the swatch alone.
+                    const sel = colorOptions.find((c) => c.key === selectedColor);
+                    const name = sel
+                      ? lang === "ar"
+                        ? sel.nameAr || sel.nameFr
+                        : sel.nameFr
+                      : "";
+                    return name ? (
+                      <span className="font-display text-[12px] font-semibold text-forest-900">
+                        {name}
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
                 <ul className="flex flex-wrap gap-2">
                   {colorOptions.map((c) => {
-                    const active = c.nameFr === selectedColor;
-                    const label = lang === "ar" ? c.nameAr || c.nameFr : c.nameFr;
+                    const active = c.key === selectedColor;
+                    const name = lang === "ar" ? c.nameAr || c.nameFr : c.nameFr;
+                    const label = name || (lang === "ar" ? "لون" : "Couleur");
                     return (
-                      <li key={c.nameFr}>
+                      <li key={c.key}>
                         <button
                           type="button"
-                          onClick={() => setSelectedColor(c.nameFr)}
+                          onClick={() => setSelectedColor(c.key)}
                           aria-pressed={active}
                           aria-label={label}
                           title={label}

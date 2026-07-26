@@ -547,9 +547,18 @@ export default function OrderDetailPage() {
                       <p className="line-clamp-2 text-sm font-medium leading-snug text-zinc-900">
                         {line.productName}
                       </p>
-                      <p className="mt-1 font-mono text-2xs uppercase tracking-wide text-zinc-500">
-                        {line.sku}
-                        {line.variant ? ` · ${line.variant}` : ""}
+                      <p className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-2xs uppercase tracking-wide text-zinc-500">
+                        {line.variantColorHex ? (
+                          <span
+                            aria-hidden
+                            className="inline-block size-3 shrink-0 rounded-full border border-zinc-300"
+                            style={{ backgroundColor: line.variantColorHex }}
+                          />
+                        ) : null}
+                        <span>
+                          {line.sku}
+                          {line.variant ? ` · ${line.variant}` : ""}
+                        </span>
                       </p>
                     </div>
                   </div>

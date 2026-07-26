@@ -281,9 +281,18 @@ function OrderCard({
                   <p className="line-clamp-2 text-[13.5px] font-medium leading-snug text-forest-900">
                     {line.productName}
                   </p>
-                  <p className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-wood-600">
-                    {line.sku}
-                    {line.variant ? ` · ${line.variant}` : ""}
+                  <p className="mt-0.5 flex flex-wrap items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-wood-600">
+                    {line.variantColorHex ? (
+                      <span
+                        aria-hidden
+                        className="inline-block size-3 shrink-0 rounded-full border border-wood-300/60"
+                        style={{ backgroundColor: line.variantColorHex }}
+                      />
+                    ) : null}
+                    <span>
+                      {line.sku}
+                      {line.variant ? ` · ${line.variant}` : ""}
+                    </span>
                   </p>
                 </div>
                 <div className="shrink-0 text-end">

@@ -38,6 +38,9 @@ export interface ApiOrderLine {
   sku: string;
   image: string | null;
   variant: string | null;
+  /** Live hex colour of the ordered variant, for rendering a swatch.
+   *  Null when the variant had no colour or was since deleted. */
+  variantColorHex?: string | null;
   quantity: number;
   unitPrice: number;
   total: number;
