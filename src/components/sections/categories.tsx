@@ -119,7 +119,7 @@ function CategoryCard({ category }: { category: SiteCategory }) {
       {/* Icon tile */}
       <div
         className={cn(
-          "grid aspect-square w-full place-items-center rounded-2xl bg-cream p-8 ring-1 ring-wood-300/40 sm:p-10 md:p-12",
+          "grid aspect-square w-full place-items-center rounded-2xl bg-cream p-5 ring-1 ring-wood-300/40 sm:p-8 md:p-10",
           "transition-all duration-300 ease-out",
           "group-hover:-translate-y-0.5 group-hover:bg-cream-deep/60 group-hover:ring-tangerine-500/45",
           "group-hover:shadow-[0_14px_28px_-14px_rgba(31,58,30,0.3)]",
