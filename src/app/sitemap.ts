@@ -27,19 +27,29 @@ type Entry = MetadataRoute.Sitemap[number];
 async function fetchProductSlugs(): Promise<Array<{ slug: string; updatedAt?: string }>> {
   const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (!base) return [];
+  // The backend hard-caps perPage at 100, so a single request can never
+  // return the whole catalogue — page through all of them (using meta.lastPage)
+  // or every product past the first 100 is missing from the sitemap.
+  const perPage = 100;
+  const out: Array<{ slug: string; updatedAt?: string }> = [];
   try {
-    const res = await fetch(`${base}/api/products?perPage=1000`, {
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) return [];
-    const body = (await res.json()) as {
-      data?: Array<{ slug: string; updatedAt?: string }>;
-    };
-    return (body.data ?? [])
-      .filter((p) => p.slug)
-      .map((p) => ({ slug: p.slug, updatedAt: p.updatedAt }));
+    for (let page = 1; page <= 50; page += 1) {
+      const res = await fetch(`${base}/api/products?perPage=${perPage}&page=${page}`, {
+        next: { revalidate: 3600 },
+      });
+      if (!res.ok) break;
+      const body = (await res.json()) as {
+        data?: Array<{ slug: string; updatedAt?: string }>;
+        meta?: { lastPage?: number };
+      };
+      for (const p of body.data ?? []) {
+        if (p.slug) out.push({ slug: p.slug, updatedAt: p.updatedAt });
+      }
+      if (page >= (body.meta?.lastPage ?? 1)) break;
+    }
+    return out;
   } catch {
-    return [];
+    return out;
   }
 }
 
