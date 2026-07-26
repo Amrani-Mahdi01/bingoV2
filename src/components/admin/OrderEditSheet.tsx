@@ -51,6 +51,9 @@ interface LineDraft {
   sku: string;
   image: string | null;
   variant: string | null;
+  /** Display-only: hex colour of the chosen variant, for the swatch.
+   *  Not part of the save payload. */
+  variantColorHex?: string | null;
   quantity: number;
   unitPrice: number;
 }
@@ -65,7 +68,11 @@ interface Props {
 
 function variantLabel(v: ApiProductVariant): string {
   const parts = [v.colorNameFr, v.sizeLabel].filter(Boolean);
-  return parts.join(" · ") || v.skuSuffix || "Variante";
+  const text = parts.join(" · ");
+  // A colour swatch is rendered next to this label, so a colour saved
+  // without a name needs no "Variante" text fallback — the swatch conveys it.
+  if (v.colorHex) return text;
+  return text || v.skuSuffix || "Variante";
 }
 
 function primaryImage(p: ApiProduct): string | null {
@@ -128,6 +135,7 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
         sku: l.sku,
         image: l.image,
         variant: l.variant,
+        variantColorHex: l.variantColorHex ?? null,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
       })),
@@ -273,6 +281,7 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
         sku: product.sku,
         image: primaryImage(product),
         variant: label,
+        variantColorHex: variant?.colorHex ?? null,
         quantity: 1,
         unitPrice: product.price + (variant?.priceDelta ?? 0),
       },
@@ -398,9 +407,18 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
                         <p className="line-clamp-2 text-xs font-medium leading-snug text-zinc-900">
                           {line.productName}
                         </p>
-                        <p className="mt-0.5 font-mono text-2xs uppercase tracking-wide text-zinc-500">
-                          {line.sku}
-                          {line.variant ? ` · ${line.variant}` : ""}
+                        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 font-mono text-2xs uppercase tracking-wide text-zinc-500">
+                          {line.variantColorHex ? (
+                            <span
+                              aria-hidden
+                              className="inline-block size-2.5 shrink-0 rounded-full border border-zinc-300"
+                              style={{ backgroundColor: line.variantColorHex }}
+                            />
+                          ) : null}
+                          <span>
+                            {line.sku}
+                            {line.variant ? ` · ${line.variant}` : ""}
+                          </span>
                         </p>
                       </div>
                       <button
@@ -550,9 +568,17 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
                               key={v.id}
                               type="button"
                               onClick={() => addProduct(p, v)}
+                              title={variantLabel(v) || "Couleur"}
                               className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-2xs text-zinc-700 hover:border-forest-600 hover:bg-forest-50"
                             >
                               <Plus className="size-3" />
+                              {v.colorHex ? (
+                                <span
+                                  aria-hidden
+                                  className="inline-block size-2.5 shrink-0 rounded-full border border-zinc-300"
+                                  style={{ backgroundColor: v.colorHex }}
+                                />
+                              ) : null}
                               {variantLabel(v)}
                               {v.priceDelta !== 0
                                 ? ` (${v.priceDelta > 0 ? "+" : ""}${v.priceDelta})`
