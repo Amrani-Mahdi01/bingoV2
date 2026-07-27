@@ -90,7 +90,13 @@ export function ProductDetails({
   // sizes-only flow, where the colour picker shouldn't appear.
   const colorOptions = React.useMemo(() => {
     const seen = new Set<string>();
-    const out: { key: string; hex: string | null; nameFr: string; nameAr: string }[] = [];
+    const out: {
+      key: string;
+      hex: string | null;
+      hex2: string | null;
+      nameFr: string;
+      nameAr: string;
+    }[] = [];
     for (const v of variants) {
       const key = colorKeyOf(v);
       if (!key) continue;
@@ -100,6 +106,7 @@ export function ProductDetails({
       out.push({
         key,
         hex: v.colorHex,
+        hex2: v.colorHex2,
         nameFr: v.colorNameFr ?? "",
         nameAr: v.colorNameAr ?? v.colorNameFr ?? "",
       });
@@ -417,7 +424,13 @@ export function ProductDetails({
                           <span
                             aria-hidden
                             className="size-7 rounded-full border border-wood-300/60"
-                            style={{ backgroundColor: c.hex ?? "#e5e5e5" }}
+                            style={
+                              c.hex2 && c.hex2.trim() !== ""
+                                ? {
+                                    background: `linear-gradient(135deg, ${c.hex ?? "#e5e5e5"} 0 50%, ${c.hex2} 50% 100%)`,
+                                  }
+                                : { backgroundColor: c.hex ?? "#e5e5e5" }
+                            }
                           />
                         </button>
                       </li>

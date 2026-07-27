@@ -68,6 +68,7 @@ interface ApiProductPayload {
     colorNameFr?: string | null;
     colorNameAr?: string | null;
     colorHex?: string | null;
+    colorHex2?: string | null;
     sizeLabel?: string | null;
     skuSuffix?: string | null;
     priceDelta?: number;
@@ -110,6 +111,7 @@ function adapt(p: ApiProductPayload): Product {
       colorNameFr: v.colorNameFr ?? null,
       colorNameAr: v.colorNameAr ?? null,
       colorHex: v.colorHex ?? null,
+      colorHex2: v.colorHex2 ?? null,
       sizeLabel: v.sizeLabel ?? null,
       priceDelta: v.priceDelta ?? 0,
       stock: v.stock ?? 0,

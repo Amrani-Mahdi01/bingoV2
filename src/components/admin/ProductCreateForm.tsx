@@ -210,6 +210,7 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       colorNameFr: v.colorNameFr,
       colorNameAr: v.colorNameAr,
       colorHex: v.colorHex,
+      colorHex2: v.colorHex2,
       sizeLabel: v.sizeLabel,
       stock: v.stock,
       priceDelta: v.priceDelta,

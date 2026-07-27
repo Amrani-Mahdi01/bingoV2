@@ -54,6 +54,8 @@ export type ProductVariant = {
   colorNameFr: string | null;
   colorNameAr: string | null;
   colorHex: string | null;
+  /** Optional second hex — two-tone ("mixed") colour; null = solid. */
+  colorHex2: string | null;
   sizeLabel: string | null;
   /** Added to `Product.price` when this variant is the selected one. */
   priceDelta: number;

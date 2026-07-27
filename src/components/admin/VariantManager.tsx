@@ -18,6 +18,8 @@ export interface VariantRow {
   colorNameFr?: string | null;
   colorNameAr?: string | null;
   colorHex?: string | null;
+  /** Optional second hex → two-tone ("mixed") colour; null/undefined = solid. */
+  colorHex2?: string | null;
   sizeLabel?: string | null;
   stock?: number;
   priceDelta?: number;
@@ -30,6 +32,8 @@ interface ColorGroup {
   nameFr: string;
   nameAr: string;
   hex: string;
+  /** Second hex for a two-tone colour, or null for a solid swatch. */
+  hex2: string | null;
   /** Stock used when this colour has no sizes (mode "colors-only"). */
   stock: number;
   sizes: SizeRow[];
@@ -98,6 +102,7 @@ export function VariantManager({ value, onChange }: VariantManagerProps) {
       nameFr: preset?.nameFr ?? "",
       nameAr: preset?.nameAr ?? "",
       hex: preset?.hex ?? "#1A1A1A",
+      hex2: null,
       stock: 0,
       sizes: [],
     };
@@ -303,6 +308,14 @@ function ModeBtn({
   );
 }
 
+/** Swatch fill — a hard 135° diagonal split for two-tone ("mixed")
+ *  colours (top-left = hex, bottom-right = hex2), else a solid fill. */
+function swatchStyle(hex: string, hex2: string | null): React.CSSProperties {
+  return hex2 && hex2.trim() !== ""
+    ? { background: `linear-gradient(135deg, ${hex} 0 50%, ${hex2} 50% 100%)` }
+    : { backgroundColor: hex };
+}
+
 function ColorGroupEditor({
   color,
   withSizes,
@@ -327,7 +340,7 @@ function ColorGroupEditor({
         {/* Color swatch + native picker */}
         <label
           className="relative inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-300 shadow-sm"
-          style={{ backgroundColor: color.hex }}
+          style={swatchStyle(color.hex, color.hex2)}
         >
           <span className="sr-only">Choisir une couleur</span>
           <input
@@ -366,6 +379,53 @@ function ColorGroupEditor({
           <Trash2 className="size-3.5" />
         </button>
       </div>
+
+      {/* Two-tone ("mixed") colour — optional second hex. When set, the
+          swatch above renders as a diagonal split of the two colours. */}
+      {color.hex2 === null ? (
+        <button
+          type="button"
+          onClick={() =>
+            onChange({
+              hex2: color.hex.toUpperCase() === "#FFFFFF" ? "#9CA3AF" : "#FFFFFF",
+            })
+          }
+          className="mt-2.5 inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 bg-white px-2.5 py-1 text-2xs font-medium text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-800"
+        >
+          <Plus className="size-3" /> 2e couleur (mixte)
+        </button>
+      ) : (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-md bg-white/70 p-2 ring-1 ring-inset ring-zinc-200">
+          <span className="text-2xs font-medium uppercase tracking-wide text-zinc-500">
+            2e couleur
+          </span>
+          <label
+            className="relative inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-300 shadow-sm"
+            style={{ backgroundColor: color.hex2 }}
+          >
+            <span className="sr-only">Choisir la 2e couleur</span>
+            <input
+              type="color"
+              value={color.hex2}
+              onChange={(e) => onChange({ hex2: e.target.value })}
+              className="absolute inset-0 size-full cursor-pointer opacity-0"
+            />
+          </label>
+          <Input
+            value={color.hex2}
+            onChange={(e) => onChange({ hex2: e.target.value })}
+            className="w-28 font-mono text-xs uppercase"
+            maxLength={9}
+          />
+          <button
+            type="button"
+            onClick={() => onChange({ hex2: null })}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-2xs font-medium text-red-700 transition-colors hover:bg-red-50"
+          >
+            <Trash2 className="size-3" /> Retirer
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 border-t border-zinc-200 pt-3">
         {withSizes ? (
@@ -554,7 +614,12 @@ function deriveState(rows: VariantRow[]): {
     // Group by (colorHex + name combination)
     const map = new Map<string, ColorGroup>();
     for (const r of rows) {
-      const key = (r.colorHex ?? "") + "|" + (r.colorNameFr ?? "");
+      const key =
+        (r.colorHex ?? "") +
+        "|" +
+        (r.colorHex2 ?? "") +
+        "|" +
+        (r.colorNameFr ?? "");
       let g = map.get(key);
       if (!g) {
         g = {
@@ -562,6 +627,7 @@ function deriveState(rows: VariantRow[]): {
           nameFr: r.colorNameFr ?? "",
           nameAr: r.colorNameAr ?? "",
           hex: r.colorHex ?? "#1A1A1A",
+          hex2: r.colorHex2 ?? null,
           stock: 0,
           sizes: [],
         };
@@ -619,6 +685,8 @@ function flatten(
       colorNameFr: c.nameFr.trim() || null,
       colorNameAr: c.nameAr.trim() || null,
       colorHex: c.hex,
+      // Only emit a valid second hex; empty/whitespace → solid colour.
+      colorHex2: c.hex2 && c.hex2.trim() !== "" ? c.hex2.trim() : null,
     };
     if (!includeSizes || c.sizes.length === 0) {
       // One row for this color, stock taken from the group itself.

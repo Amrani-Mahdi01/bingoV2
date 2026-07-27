@@ -18,6 +18,8 @@ export interface ApiProductVariant {
   colorNameFr: string | null;
   colorNameAr: string | null;
   colorHex: string | null;
+  /** Optional second hex — set for two-tone ("mixed") colours; null = solid. */
+  colorHex2: string | null;
   sizeLabel: string | null;
   skuSuffix: string | null;
   priceDelta: number;
@@ -90,6 +92,7 @@ export interface ProductPayload {
     colorNameFr?: string | null;
     colorNameAr?: string | null;
     colorHex?: string | null;
+    colorHex2?: string | null;
     sizeLabel?: string | null;
     stock?: number;
     priceDelta?: number;
