@@ -69,6 +69,57 @@ export async function getServerSiteBranding(): Promise<SiteBranding> {
   return siteBrandingFromSettings(map);
 }
 
+/** Shared shape of a public product row as returned by /api/products. */
+type PublicProductRow = {
+  slug: string;
+  nameFr: string;
+  nameAr: string;
+  price: number;
+  oldPrice?: number | null;
+  brand?: { name?: string } | null;
+  images?: Array<{ url: string }>;
+};
+
+/**
+ * Fetch EVERY page of the public catalogue and return the flat product
+ * list. The backend caps `perPage` at 100, so a single request only
+ * returns the newest 100 active products — an admin-picked featured
+ * product filed past that cutoff would otherwise fail to resolve and its
+ * hero slot would silently vanish. Pages 2..lastPage are fetched in
+ * parallel. Returns [] on any error (caller falls back to dropping
+ * unresolved slots, same as before).
+ */
+async function fetchAllPublicProducts(
+  apiBase: string,
+): Promise<PublicProductRow[]> {
+  const pageUrl = (page: number) =>
+    `${apiBase}/api/products?perPage=100&page=${page}`;
+  try {
+    const first = await serverFetch(pageUrl(1), { next: { revalidate: 30 } });
+    if (!first.ok) return [];
+    const body = (await first.json()) as {
+      data?: PublicProductRow[];
+      meta?: { lastPage?: number };
+    };
+    const all = [...(body.data ?? [])];
+    const lastPage = body.meta?.lastPage ?? 1;
+    if (lastPage > 1) {
+      const rest = await Promise.all(
+        Array.from({ length: lastPage - 1 }, (_, i) =>
+          serverFetch(pageUrl(i + 2), { next: { revalidate: 30 } })
+            .then((r) => (r.ok ? r.json() : { data: [] }))
+            .then((b) => (b as { data?: PublicProductRow[] }).data ?? [])
+            .catch(() => [] as PublicProductRow[]),
+        ),
+      );
+      for (const arr of rest) all.push(...arr);
+    }
+    return all;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Server-side seed for SiteHomeProvider — hero featured picks + promo
  * banner. Resolves admin-picked product AND category slugs against the
@@ -107,7 +158,7 @@ export async function getServerSiteHome(): Promise<SiteHome> {
   // in parallel. Each is a single request — cheaper than per-slug lookups.
   const [productsRes, categoriesRes, bestRes, newRes, promoRes] = await Promise.allSettled([
     productSlugs.length > 0
-      ? serverFetch(`${apiBase}/api/products?perPage=100`, { next: { revalidate: 30 } })
+      ? fetchAllPublicProducts(apiBase)
       : Promise.resolve(null),
     categorySlugs.length > 0
       ? serverFetch(`${apiBase}/api/categories`, { next: { revalidate: 30 } })
@@ -154,35 +205,9 @@ export async function getServerSiteHome(): Promise<SiteHome> {
     }
   }
 
-  const productBySlug = new Map<
-    string,
-    {
-      slug: string;
-      nameFr: string;
-      nameAr: string;
-      price: number;
-      oldPrice?: number | null;
-      brand?: { name?: string } | null;
-      images?: Array<{ url: string }>;
-    }
-  >();
-  if (productsRes.status === "fulfilled" && productsRes.value && productsRes.value.ok) {
-    try {
-      const body = (await productsRes.value.json()) as {
-        data?: Array<{
-          slug: string;
-          nameFr: string;
-          nameAr: string;
-          price: number;
-          oldPrice?: number | null;
-          brand?: { name?: string } | null;
-          images?: Array<{ url: string }>;
-        }>;
-      };
-      for (const p of body.data ?? []) productBySlug.set(p.slug, p);
-    } catch {
-      /* swallow */
-    }
+  const productBySlug = new Map<string, PublicProductRow>();
+  if (productsRes.status === "fulfilled" && Array.isArray(productsRes.value)) {
+    for (const p of productsRes.value) productBySlug.set(p.slug, p);
   }
 
   const categoryBySlug = new Map<
