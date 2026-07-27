@@ -13,12 +13,13 @@ import {
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DashboardKpis } from "@/components/admin/DashboardKpis";
 import { Small } from "@/components/ui/typography";
-import { bannersApi } from "@/lib/api/banners";
 import { brandsApi } from "@/lib/api/brands";
 import { categoriesApi } from "@/lib/api/categories";
 import { HttpError } from "@/lib/api/http";
 import { productsApi } from "@/lib/api/products";
+import { settingsApi } from "@/lib/api/settings";
 import { statsApi, type DashboardStats } from "@/lib/api/stats";
+import { decodeRef, FEATURED_COUNT } from "@/lib/site-home";
 import { cn } from "@/lib/utils";
 
 interface Counts {
@@ -38,19 +39,27 @@ export default function AdminDashboardPage() {
       productsApi.listAll({ perPage: 1 }),
       categoriesApi.listAll(),
       brandsApi.listAll(),
-      bannersApi.listAll(),
+      settingsApi.listAll(),
       statsApi.dashboard(),
     ])
-      .then(([prods, cats, brands, banners, dash]) => {
+      .then(([prods, cats, brands, settings, dash]) => {
         const catTotal = cats.reduce(
           (acc, c) => acc + 1 + (c.children?.length ?? 0),
           0,
         );
+        // "Bannières" links to /admin/banners, which manages the homepage
+        // hero featured slots (stored in settings as home.featured.slug.N),
+        // not the legacy banners table. Count the filled slots so the tile
+        // matches the "N/6 remplis" shown on that page.
+        const filledSlots = Array.from(
+          { length: FEATURED_COUNT },
+          (_, i) => decodeRef(settings[`home.featured.slug.${i}`]),
+        ).filter(Boolean).length;
         setCounts({
           products: prods.meta.total,
           categories: catTotal,
           brands: brands.length,
-          banners: banners.length,
+          banners: filledSlots,
         });
         setStats(dash);
       })
