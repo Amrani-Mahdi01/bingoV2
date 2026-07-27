@@ -24,8 +24,8 @@ import { useSiteCategories } from "@/lib/site-categories-context";
 import { cn } from "@/lib/utils";
 
 /** Flattened product row the catalogue page works with. Built on mount
- *  from /api/products?perPage=100 — keeps every filter/sort instant
- *  without per-keystroke API calls. */
+ *  from the full /api/products catalogue (all pages) — keeps every
+ *  filter/sort instant without per-keystroke API calls. */
 interface CatalogueProduct {
   slug: string;
   nameFr: string;
@@ -169,8 +169,8 @@ function CatalogueContent() {
   React.useEffect(() => {
     const ctrl = new AbortController();
     productsApi
-      .listPublic({ perPage: 100, signal: ctrl.signal })
-      .then((res) => {
+      .listEveryPublic({ signal: ctrl.signal })
+      .then((products) => {
         // Build leaf-slug → top-level-slug map so a product filed under
         // a sub-category still matches its parent in the sidebar filter.
         const parentBySlug = new Map<string, string>();
@@ -180,7 +180,7 @@ function CatalogueContent() {
             parentBySlug.set(sub.slug, top.slug);
           }
         }
-        const list: CatalogueProduct[] = res.data.map((p) =>
+        const list: CatalogueProduct[] = products.map((p) =>
           adaptApiProduct(p, parentBySlug),
         );
         setAllProducts(list);

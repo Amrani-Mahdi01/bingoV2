@@ -158,15 +158,42 @@ export const productsApi = {
   },
 
   /** Public catalogue list — hits `GET /api/products` (no auth) and
-   *  pulls up to `perPage` active products. The storefront /catalogue
-   *  page loads the whole list once and filters/sorts client-side. */
-  listPublic(opts: { perPage?: number; signal?: AbortSignal } = {}): Promise<ListResponse> {
+   *  pulls up to `perPage` active products (one page). The backend caps
+   *  `perPage` at 100; use `listEveryPublic` to get the full catalogue. */
+  listPublic(opts: { page?: number; perPage?: number; signal?: AbortSignal } = {}): Promise<ListResponse> {
     const query = new URLSearchParams();
     query.set("perPage", String(opts.perPage ?? 100));
+    if (opts.page) query.set("page", String(opts.page));
     return http.get<ListResponse>(
       `/api/products?${query.toString()}`,
       { auth: "none", signal: opts.signal },
     );
+  },
+
+  /**
+   * Fetches the ENTIRE public catalogue by walking every page.
+   *
+   * The backend caps `perPage` at 100, so a single `listPublic` call only
+   * ever returns the newest 100 active products. The /catalogue page loads
+   * the whole list once and filters/sorts client-side — with only 100 rows
+   * any category whose products fall past that cutoff shows fewer cards than
+   * its sidebar count. Pages 2..lastPage are fetched in parallel but the
+   * result keeps page order, preserving the backend's newest-first sort that
+   * the "popular"/"newest" options rely on.
+   */
+  async listEveryPublic(
+    opts: { signal?: AbortSignal } = {},
+  ): Promise<ApiProduct[]> {
+    const perPage = 100;
+    const first = await this.listPublic({ page: 1, perPage, signal: opts.signal });
+    const lastPage = first.meta?.lastPage ?? 1;
+    if (lastPage <= 1) return first.data;
+    const rest = await Promise.all(
+      Array.from({ length: lastPage - 1 }, (_, i) =>
+        this.listPublic({ page: i + 2, perPage, signal: opts.signal }),
+      ),
+    );
+    return [first.data, ...rest.map((r) => r.data)].flat();
   },
 
   get(id: string): Promise<ApiProduct> {
