@@ -423,11 +423,19 @@ export function ProductDetails({
                         >
                           <span
                             aria-hidden
-                            className="size-7 rounded-full border border-wood-300/60"
+                            className={cn(
+                              "size-7 rounded-full",
+                              // Crisper full edge for two-tone chips so a
+                              // white/light half never looks cut-off on the
+                              // cream page; solid swatches keep the softer ring.
+                              c.hex2 && c.hex2.trim() !== ""
+                                ? "border border-wood-400/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]"
+                                : "border border-wood-300/60",
+                            )}
                             style={
                               c.hex2 && c.hex2.trim() !== ""
                                 ? {
-                                    background: `linear-gradient(135deg, ${c.hex ?? "#e5e5e5"} 0 50%, ${c.hex2} 50% 100%)`,
+                                    background: `linear-gradient(135deg, ${c.hex ?? "#e5e5e5"} 0 calc(50% - 1px), #ffffff calc(50% - 1px) calc(50% + 1px), ${c.hex2} calc(50% + 1px) 100%)`,
                                   }
                                 : { backgroundColor: c.hex ?? "#e5e5e5" }
                             }

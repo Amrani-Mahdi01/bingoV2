@@ -308,11 +308,14 @@ function ModeBtn({
   );
 }
 
-/** Swatch fill — a hard 135° diagonal split for two-tone ("mixed")
- *  colours (top-left = hex, bottom-right = hex2), else a solid fill. */
+/** Swatch fill — a 135° diagonal split for two-tone ("mixed") colours
+ *  (top-left = hex, bottom-right = hex2) with a thin light seam so the
+ *  two halves read as an intentional colourway; else a solid fill. */
 function swatchStyle(hex: string, hex2: string | null): React.CSSProperties {
   return hex2 && hex2.trim() !== ""
-    ? { background: `linear-gradient(135deg, ${hex} 0 50%, ${hex2} 50% 100%)` }
+    ? {
+        background: `linear-gradient(135deg, ${hex} 0 calc(50% - 1px), #ffffff calc(50% - 1px) calc(50% + 1px), ${hex2} calc(50% + 1px) 100%)`,
+      }
     : { backgroundColor: hex };
 }
 
