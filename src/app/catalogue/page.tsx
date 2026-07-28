@@ -1536,7 +1536,11 @@ function Pagination({
   return (
     <nav
       aria-label={t("pagination.aria")}
-      className="mt-10 flex items-center justify-center gap-1.5 sm:gap-2"
+      // flex-wrap + max-w-full: on middle pages the numbered list grows to
+      // ~9 fixed-width buttons, which is wider than a narrow phone. Without
+      // wrapping it overflowed the viewport, pushing the whole grid off the
+      // right edge and adding horizontal scroll. Wrapping keeps it contained.
+      className="mt-10 flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2"
     >
       <PaginationArrow
         direction="prev"
