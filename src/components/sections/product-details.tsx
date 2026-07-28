@@ -599,7 +599,7 @@ export function ProductDetails({
           Pinned to the bottom edge of the viewport so the actions stay
           reachable from any scroll position. Hidden on lg+ where the
           inline CTAs are visible. */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-wood-300/40 bg-cream/95 backdrop-blur-md shadow-[0_-8px_24px_-12px_rgba(31,58,30,0.18)] lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-wood-300/40 bg-cream shadow-[0_-8px_24px_-12px_rgba(31,58,30,0.18)] lg:hidden">
         <div className="mx-auto flex max-w-7xl gap-2 px-4 py-3 sm:gap-3 sm:px-6">
           <button
             type="button"

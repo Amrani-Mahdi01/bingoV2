@@ -242,9 +242,13 @@ export function Header() {
       {/* ─── Main bar ──────────────────────────────────────────────── */}
       <div
         className={cn(
-          "relative border-b transition-[background-color,backdrop-filter,border-color,box-shadow] duration-300",
+          // NOTE: no backdrop-blur here. A backdrop-filter on this sticky
+          // bar smears/duplicates the whole scrolling grid on some Android
+          // GPUs (the "glitch on scroll"). An opaque bg avoids it — the bar
+          // was already 85% opaque, so the look barely changes.
+          "relative border-b transition-[background-color,border-color,box-shadow] duration-300",
           scrolled
-            ? "border-wood-300/60 bg-cream/85 shadow-[0_1px_0_0_rgba(91,69,42,0.04),0_8px_24px_-12px_rgba(31,58,30,0.18)] backdrop-blur-md"
+            ? "border-wood-300/60 bg-cream shadow-[0_1px_0_0_rgba(91,69,42,0.04),0_8px_24px_-12px_rgba(31,58,30,0.18)]"
             : "border-transparent bg-cream"
         )}
       >

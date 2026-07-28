@@ -86,7 +86,10 @@ export function ProductActions({
         }
         aria-pressed={favorited}
         className={cn(
-          "grid size-8 place-items-center rounded-full bg-cream/95 shadow-sm backdrop-blur-sm",
+          // No backdrop-blur: it's imperceptible over a 95%-opaque bg but
+          // adds a per-card backdrop-filter layer that aggravates the
+          // Android scroll-smear glitch in the product grid.
+          "grid size-8 place-items-center rounded-full bg-cream/95 shadow-sm",
           "transition-all duration-200 hover:bg-cream hover:shadow-md",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500",
           favorited
