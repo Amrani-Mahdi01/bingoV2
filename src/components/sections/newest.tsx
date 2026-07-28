@@ -183,7 +183,7 @@ function ProductCardInner({
     <TentLink
       href={`/produit/${slug}`}
       className={cn(
-        "group relative flex h-full flex-col overflow-hidden rounded-xl border border-cream/10 bg-forest-900/60 backdrop-blur-sm",
+        "group relative flex h-full flex-col overflow-hidden rounded-xl border border-cream/10 bg-forest-900/60",
         "transition-all duration-300 hover:-translate-y-0.5 hover:border-tangerine-400/60 hover:bg-forest-800/80 hover:shadow-[0_14px_32px_-14px_rgba(0,0,0,0.55)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-400"
       )}

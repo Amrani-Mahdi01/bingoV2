@@ -496,7 +496,7 @@ export default function ShippingPage() {
 
       {/* Sticky bulk save */}
       {dirtyRows.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white px-4 py-3 sm:px-6">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-amber-900">
               <span className="inline-flex size-2 rounded-full bg-amber-500 align-middle" />{" "}

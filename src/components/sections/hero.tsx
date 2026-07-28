@@ -558,7 +558,7 @@ function HeroDeck({
             <span
               className={[
                 "absolute bottom-1.5 left-1/2 -translate-x-1/2 max-w-[90%] truncate rounded-full px-2 py-0.5",
-                "font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-cream backdrop-blur sm:text-[10.5px]",
+                "font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-cream sm:text-[10.5px]",
                 p.kind === "product" ? "bg-forest-900/90" : "bg-tangerine-600/95",
               ].join(" ")}
             >

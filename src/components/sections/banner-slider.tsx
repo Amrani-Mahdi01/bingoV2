@@ -273,7 +273,7 @@ export function BannerSlider({
           </div>
 
           {/* Prev / next */}
-          <div className="pointer-events-auto inline-flex overflow-hidden rounded-full border border-cream/25 bg-forest-900/45 backdrop-blur">
+          <div className="pointer-events-auto inline-flex overflow-hidden rounded-full border border-cream/25 bg-forest-900/80">
             <button
               type="button"
               onClick={prev}

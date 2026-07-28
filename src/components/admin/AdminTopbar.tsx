@@ -58,7 +58,7 @@ export function AdminTopbar() {
   const { setOpen } = useAdminMobileNav();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-zinc-200 bg-white/95 px-4 backdrop-blur sm:gap-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-zinc-200 bg-white px-4 sm:gap-4 sm:px-6">
       {/* Hamburger — mobile only. The sidebar mounts as a drawer
           below md and the topbar drives its open state via
           AdminMobileNavContext. Hidden on md+ where the sidebar is

@@ -805,7 +805,7 @@ function ProductImageSlider({
             onClick={() => setLightbox(imageIndexForSlide(selected))}
             aria-label={t("product.image.zoom")}
             title={t("product.image.zoom")}
-            className="absolute end-3 top-3 z-10 grid size-10 place-items-center rounded-full bg-cream/85 text-forest-900 backdrop-blur transition-all hover:bg-cream hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
+            className="absolute end-3 top-3 z-10 grid size-10 place-items-center rounded-full bg-cream text-forest-900 transition-all hover:bg-cream hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
           >
             <ZoomIn className="size-4" strokeWidth={2.2} />
           </button>
@@ -818,7 +818,7 @@ function ProductImageSlider({
               type="button"
               onClick={() => emblaApi?.scrollPrev()}
               aria-label={t("product.image.prev")}
-              className="absolute start-3 top-1/2 z-10 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-cream/85 text-forest-900 backdrop-blur transition-all hover:bg-cream hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
+              className="absolute start-3 top-1/2 z-10 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-cream text-forest-900 transition-all hover:bg-cream hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
             >
               <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={2.2} />
             </button>
@@ -826,7 +826,7 @@ function ProductImageSlider({
               type="button"
               onClick={() => emblaApi?.scrollNext()}
               aria-label={t("product.image.next")}
-              className="absolute end-3 top-1/2 z-10 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-cream/85 text-forest-900 backdrop-blur transition-all hover:bg-cream hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
+              className="absolute end-3 top-1/2 z-10 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-cream text-forest-900 transition-all hover:bg-cream hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tangerine-500"
             >
               <ChevronRight className="size-4 rtl:rotate-180" strokeWidth={2.2} />
             </button>
@@ -1072,7 +1072,7 @@ function ImageLightbox({
       aria-modal="true"
       aria-label={name}
       onClick={onClose}
-      className="fixed inset-0 z-[100] bg-forest-900/95 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] bg-forest-900/95"
     >
       {/* Close */}
       <button

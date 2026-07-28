@@ -144,7 +144,7 @@ export function ProductVideoPlayer({
           aria-label={t("Lire la vidéo", "تشغيل الفيديو")}
           className={cn(
             "absolute left-1/2 top-1/2 z-10 grid size-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full sm:size-20",
-            "bg-cream/90 text-forest-900 shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] backdrop-blur",
+            "bg-cream text-forest-900 shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)]",
             "transition-transform duration-200 hover:scale-105 hover:bg-cream",
             "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tangerine-300/50",
           )}

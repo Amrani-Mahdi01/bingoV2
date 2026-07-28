@@ -1081,7 +1081,7 @@ export function ProductCreateForm({ initialProduct }: ProductCreateFormProps = {
       </Section>
 
       {/* Save bar */}
-      <div className="sticky bottom-0 -mx-4 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+      <div className="sticky bottom-0 -mx-4 border-t border-zinc-200 bg-white px-4 py-3 sm:-mx-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-end gap-3">
           <Button
             type="button"
