@@ -67,6 +67,7 @@ export interface ApiOrder {
   orderNumber: string;
   status:
     | "pending"
+    | "no_answer"
     | "confirmed"
     | "preparing"
     | "shipped"

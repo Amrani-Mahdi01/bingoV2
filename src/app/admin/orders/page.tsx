@@ -52,6 +52,11 @@ const STATUS_META: Record<
     cls: "bg-amber-50 text-amber-700 border-amber-200",
     dot: "bg-amber-500",
   },
+  no_answer: {
+    label: "Appel sans réponse",
+    cls: "bg-orange-50 text-orange-700 border-orange-200",
+    dot: "bg-orange-500",
+  },
   confirmed: {
     label: "Confirmée",
     cls: "bg-blue-50 text-blue-700 border-blue-200",
@@ -86,6 +91,7 @@ const STATUS_META: Record<
 
 const STATUS_ORDER: ApiOrder["status"][] = [
   "pending",
+  "no_answer",
   "confirmed",
   "preparing",
   "shipped",

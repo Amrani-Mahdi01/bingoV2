@@ -159,6 +159,32 @@ export function QuickOrderDialog({
 
   const homeFee = selectedWilaya?.shippingPrice ?? null;
   const stopFee = selectedWilaya?.stopDeskPrice ?? null;
+
+  // Stop-desk delivery is only offered in communes that actually host a ZR
+  // pickup point. Filtering the list (instead of showing every commune) stops
+  // customers picking a desk-less commune that ZR rejects at ship time.
+  const stopDeskCommunes = React.useMemo(
+    () => communes.filter((c) => c.hasStopDesk),
+    [communes],
+  );
+  const noStopDeskHere =
+    !!selectedWilaya && !loadingCommunes && stopDeskCommunes.length === 0;
+  const visibleCommunes = delivery === "stop" ? stopDeskCommunes : communes;
+
+  // A wilaya with no desk at all can't offer stop-desk — fall back to home.
+  React.useEffect(() => {
+    if (noStopDeskHere && delivery === "stop") setDelivery("home");
+  }, [noStopDeskHere, delivery]);
+
+  // Never keep a commune selected that isn't valid for the chosen delivery
+  // (e.g. after switching to stop-desk, or after the commune list reloads).
+  React.useEffect(() => {
+    if (delivery !== "stop" || loadingCommunes) return;
+    if (commune && !stopDeskCommunes.some((c) => c.name === commune)) {
+      setCommune("");
+    }
+  }, [delivery, loadingCommunes, commune, stopDeskCommunes]);
+
   const pickedFee = delivery === "home" ? homeFee : stopFee;
   const subtotal = items.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
   const total = subtotal + (pickedFee ?? 0);
@@ -403,7 +429,7 @@ export function QuickOrderDialog({
                 <Field label={t("checkout.commune")} error={errors.commune}>
                   <SelectShell
                     disabled={
-                      loadingCommunes || !selectedWilaya || communes.length === 0
+                      loadingCommunes || !selectedWilaya || visibleCommunes.length === 0
                     }
                   >
                     <select
@@ -417,16 +443,18 @@ export function QuickOrderDialog({
                         "cursor-pointer appearance-none pe-10",
                         "disabled:cursor-not-allowed disabled:bg-cream-deep/40 disabled:text-wood-400 disabled:opacity-70",
                       )}
-                      disabled={loadingCommunes || !selectedWilaya || communes.length === 0}
+                      disabled={loadingCommunes || !selectedWilaya || visibleCommunes.length === 0}
                     >
                       <option value="">
                         {loadingCommunes
                           ? lang === "ar" ? "تحميل…" : "Chargement…"
-                          : communes.length
-                            ? t("checkout.commune.placeholder")
+                          : visibleCommunes.length
+                            ? delivery === "stop"
+                              ? lang === "ar" ? "اختر مكتب الاستلام" : "Choisir le point stop desk"
+                              : t("checkout.commune.placeholder")
                             : t("checkout.commune.placeholderEmpty")}
                       </option>
-                      {communes.map((c) => (
+                      {visibleCommunes.map((c) => (
                         <option key={c.id} value={c.name}>
                           {lang === "ar" && c.nameAr ? c.nameAr : c.name}
                         </option>
@@ -450,8 +478,16 @@ export function QuickOrderDialog({
                     title={t("checkout.delivery.stop.title")}
                     price={stopFee}
                     formatPrice={formatPrice}
+                    disabled={noStopDeskHere}
                   />
                 </div>
+                {noStopDeskHere ? (
+                  <p className="-mt-1 font-mono text-[10.5px] leading-relaxed text-wood-600">
+                    {lang === "ar"
+                      ? "لا يوجد مكتب استلام (stop desk) في هذه الولاية — اختر التوصيل إلى المنزل."
+                      : "Pas de point stop desk dans cette wilaya — choisissez la livraison à domicile."}
+                  </p>
+                ) : null}
 
                 {RECAPTCHA_SITE_KEY ? (
                   <div className="mt-1">
@@ -597,23 +633,27 @@ function DeliveryOption({
   title,
   price,
   formatPrice,
+  disabled = false,
 }: {
   active: boolean;
   onSelect: () => void;
   title: string;
   price: number | null;
   formatPrice: (n: number) => string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={active}
+      disabled={disabled}
       className={cn(
         "flex flex-col items-start gap-1 rounded-xl border p-3 text-start transition-all duration-200",
         active
           ? "border-forest-900 bg-cream shadow-[0_8px_24px_-12px_rgba(31,58,30,0.25)]"
           : "border-wood-300 bg-cream/60 hover:border-wood-500",
+        disabled && "cursor-not-allowed opacity-50 hover:border-wood-300",
       )}
     >
       <span className="font-display text-[13px] font-semibold text-forest-900">{title}</span>

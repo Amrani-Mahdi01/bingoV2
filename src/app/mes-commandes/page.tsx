@@ -25,6 +25,7 @@ const STATUS_META: Record<
   { fr: string; ar: string; cls: string; dot: string }
 > = {
   pending:   { fr: "En attente",  ar: "قيد الانتظار", cls: "bg-amber-50 text-amber-700 border-amber-200",     dot: "bg-amber-500" },
+  no_answer: { fr: "Appel sans réponse", ar: "مكالمة بدون رد", cls: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" },
   confirmed: { fr: "Confirmée",   ar: "مؤكدة",        cls: "bg-blue-50 text-blue-700 border-blue-200",        dot: "bg-blue-500" },
   preparing: { fr: "Préparation", ar: "قيد التحضير",  cls: "bg-violet-50 text-violet-700 border-violet-200",  dot: "bg-violet-500" },
   shipped:   { fr: "Expédiée",    ar: "تم الشحن",     cls: "bg-cyan-50 text-cyan-700 border-cyan-200",        dot: "bg-cyan-500" },

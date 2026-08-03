@@ -58,6 +58,7 @@ const STATUS_META: Record<
   { label: string; cls: string; dot: string }
 > = {
   pending:   { label: "En attente",   cls: "bg-amber-50 text-amber-700 border-amber-200",       dot: "bg-amber-500" },
+  no_answer: { label: "Appel sans réponse", cls: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" },
   confirmed: { label: "Confirmée",    cls: "bg-blue-50 text-blue-700 border-blue-200",         dot: "bg-blue-500" },
   preparing: { label: "Préparation",  cls: "bg-violet-50 text-violet-700 border-violet-200",   dot: "bg-violet-500" },
   shipped:   { label: "Expédiée",     cls: "bg-cyan-50 text-cyan-700 border-cyan-200",         dot: "bg-cyan-500" },
@@ -68,6 +69,7 @@ const STATUS_META: Record<
 
 const STATUS_ORDER: ApiOrder["status"][] = [
   "pending",
+  "no_answer",
   "confirmed",
   "preparing",
   "shipped",

@@ -49,6 +49,7 @@ function pickStatus(): OrderStatus {
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: "Commande reçue",
+  no_answer: "Appel sans réponse",
   confirmed: "Confirmée par téléphone",
   preparing: "Préparation en cours",
   shipped: "Expédiée via ZR Express",
@@ -60,6 +61,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 // How many days it typically takes to transition between states.
 const STATUS_DAYS: Record<OrderStatus, number> = {
   pending: 0,
+  no_answer: 0,
   confirmed: 1,
   preparing: 2,
   shipped: 3,

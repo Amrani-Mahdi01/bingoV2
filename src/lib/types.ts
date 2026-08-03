@@ -29,6 +29,10 @@ export interface Commune {
   code: string; // postal code or admin ref
   name: string; // French
   nameAr: string; // Arabic
+  /** True when this commune hosts a ZR Express pickup point (stop desk).
+   *  Drives the checkout: stop-desk delivery is only offered where a desk
+   *  actually exists. Populated by the ZR "sync territories" action. */
+  hasStopDesk?: boolean;
 }
 
 /* -----------------------------------------------------------
@@ -130,6 +134,7 @@ export interface Product {
 
 export type OrderStatus =
   | "pending"
+  | "no_answer"
   | "confirmed"
   | "preparing"
   | "shipped"
