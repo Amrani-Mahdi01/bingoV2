@@ -35,6 +35,16 @@ export interface Commune {
   hasStopDesk?: boolean;
 }
 
+/** A ZR Express pickup point (stop desk) — one selectable option when the
+ *  customer chooses stop-desk delivery. A wilaya can have several, even in
+ *  the same commune. `id` is ZR's hub UUID, sent back on order creation. */
+export interface StopDesk {
+  id: string;
+  name: string; // clean label, e.g. "Zouaghi"
+  commune: string | null; // commune the desk sits in
+  address: string | null; // "street, city"
+}
+
 /* -----------------------------------------------------------
    Catalog primitives
    ----------------------------------------------------------- */

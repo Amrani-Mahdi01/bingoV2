@@ -16,7 +16,7 @@ import { ordersApi } from "@/lib/api/orders";
 import { wilayasApi } from "@/lib/api/wilayas";
 import { refreshPendingOrders } from "@/lib/hooks/usePendingOrders";
 import { useFormatPrice, useLanguage } from "@/lib/i18n";
-import type { Commune, Wilaya } from "@/lib/types";
+import type { Commune, StopDesk, Wilaya } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /* Algerian mobile validation — mirrors /commander exactly. */
@@ -97,6 +97,10 @@ export function QuickOrderDialog({
   const [wilayas, setWilayas] = React.useState<Wilaya[] | null>(null);
   const [communes, setCommunes] = React.useState<Commune[]>([]);
   const [loadingCommunes, setLoadingCommunes] = React.useState(false);
+  // Stop-desk (ZR pickup points) for the picked wilaya + the chosen desk id.
+  const [stopDesks, setStopDesks] = React.useState<StopDesk[]>([]);
+  const [loadingStopDesks, setLoadingStopDesks] = React.useState(false);
+  const [stopDeskId, setStopDeskId] = React.useState("");
 
   // Reset everything each time the dialog opens.
   React.useEffect(() => {
@@ -106,6 +110,7 @@ export function QuickOrderDialog({
     setPhone("");
     setWilayaCode("");
     setCommune("");
+    setStopDeskId("");
     setDelivery("home");
     setErrors({});
     setServerError(null);
@@ -157,34 +162,51 @@ export function QuickOrderDialog({
     return () => ctrl.abort();
   }, [selectedWilaya]);
 
+  // Load the wilaya's stop desks (ZR pickup points) alongside communes, so the
+  // desk picker is ready the moment the customer switches to stop-desk.
+  React.useEffect(() => {
+    if (!selectedWilaya) {
+      setStopDesks([]);
+      return;
+    }
+    const ctrl = new AbortController();
+    setLoadingStopDesks(true);
+    wilayasApi
+      .listStopDesksPublic(selectedWilaya.id)
+      .then((rows) => {
+        if (!ctrl.signal.aborted) setStopDesks(rows);
+      })
+      .catch(() => {
+        if (!ctrl.signal.aborted) setStopDesks([]);
+      })
+      .finally(() => {
+        if (!ctrl.signal.aborted) setLoadingStopDesks(false);
+      });
+    return () => ctrl.abort();
+  }, [selectedWilaya]);
+
   const homeFee = selectedWilaya?.shippingPrice ?? null;
   const stopFee = selectedWilaya?.stopDeskPrice ?? null;
 
-  // Stop-desk delivery is only offered in communes that actually host a ZR
-  // pickup point. Filtering the list (instead of showing every commune) stops
-  // customers picking a desk-less commune that ZR rejects at ship time.
-  const stopDeskCommunes = React.useMemo(
-    () => communes.filter((c) => c.hasStopDesk),
-    [communes],
-  );
+  // Stop-desk delivery lets the customer pick the EXACT ZR pickup point (a
+  // wilaya can have several, even in the same commune). If a wilaya has no
+  // desk at all, stop-desk isn't offered there.
   const noStopDeskHere =
-    !!selectedWilaya && !loadingCommunes && stopDeskCommunes.length === 0;
-  const visibleCommunes = delivery === "stop" ? stopDeskCommunes : communes;
+    !!selectedWilaya && !loadingStopDesks && stopDesks.length === 0;
 
-  // A wilaya with no desk at all can't offer stop-desk — fall back to home.
+  // A wilaya with no desk can't offer stop-desk — fall back to home.
   React.useEffect(() => {
     if (noStopDeskHere && delivery === "stop") setDelivery("home");
   }, [noStopDeskHere, delivery]);
 
-  // Never keep a commune selected that isn't valid for the chosen delivery
-  // (e.g. after switching to stop-desk, or after the commune list reloads).
+  // Drop a stale desk selection when the desk list changes (wilaya switch).
   React.useEffect(() => {
-    if (delivery !== "stop" || loadingCommunes) return;
-    if (commune && !stopDeskCommunes.some((c) => c.name === commune)) {
-      setCommune("");
+    if (stopDeskId && !stopDesks.some((d) => d.id === stopDeskId)) {
+      setStopDeskId("");
     }
-  }, [delivery, loadingCommunes, commune, stopDeskCommunes]);
+  }, [stopDesks, stopDeskId]);
 
+  const chosenDesk = stopDesks.find((d) => d.id === stopDeskId) ?? null;
   const pickedFee = delivery === "home" ? homeFee : stopFee;
   const subtotal = items.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
   const total = subtotal + (pickedFee ?? 0);
@@ -211,7 +233,14 @@ export function QuickOrderDialog({
     )
       e.phone = t("checkout.error.phoneInvalid");
     if (!wilayaCode) e.wilaya = t("checkout.error.wilaya");
-    if (!commune) e.commune = t("checkout.error.commune");
+    // For stop-desk the second field is the pickup point; for home it's the
+    // commune. Only one is shown at a time, so both use the `commune` slot.
+    if (delivery === "stop") {
+      if (!stopDeskId)
+        e.commune = lang === "ar" ? "اختر مكتب الاستلام" : "Choisissez un point de retrait";
+    } else if (!commune) {
+      e.commune = t("checkout.error.commune");
+    }
     if (RECAPTCHA_SITE_KEY && !recaptchaToken) e.recaptcha = t("checkout.error.recaptcha");
     return e;
   };
@@ -234,11 +263,16 @@ export function QuickOrderDialog({
         },
         shipping: {
           wilayaId: wilayaCode,
-          commune,
+          // Home → commune; stop-desk → the exact desk (commune is derived
+          // server-side from the chosen desk).
+          ...(delivery === "stop" ? { stopDeskId } : { commune }),
           // Structured choice — drives the server-side fee + the ZR parcel
           // delivery type. The note is kept for human-readable history.
           deliveryType: delivery === "stop" ? "stopdesk" : "home",
-          notes: delivery === "stop" ? "Livraison stop desk" : "Livraison à domicile",
+          notes:
+            delivery === "stop"
+              ? `Stop desk${chosenDesk ? ` : ${chosenDesk.name}${chosenDesk.commune ? ` (${chosenDesk.commune})` : ""}` : ""}`
+              : "Livraison à domicile",
         },
         lines: items.map((it) => ({
           productSlug: it.productSlug,
@@ -402,6 +436,7 @@ export function QuickOrderDialog({
                       onChange={(e) => {
                         setWilayaCode(e.target.value);
                         setCommune("");
+                        setStopDeskId("");
                         clearError("wilaya");
                         clearError("commune");
                       }}
@@ -426,44 +461,8 @@ export function QuickOrderDialog({
                   </SelectShell>
                 </Field>
 
-                <Field label={t("checkout.commune")} error={errors.commune}>
-                  <SelectShell
-                    disabled={
-                      loadingCommunes || !selectedWilaya || visibleCommunes.length === 0
-                    }
-                  >
-                    <select
-                      value={commune}
-                      onChange={(e) => {
-                        setCommune(e.target.value);
-                        clearError("commune");
-                      }}
-                      className={cn(
-                        inputCls(!!errors.commune),
-                        "cursor-pointer appearance-none pe-10",
-                        "disabled:cursor-not-allowed disabled:bg-cream-deep/40 disabled:text-wood-400 disabled:opacity-70",
-                      )}
-                      disabled={loadingCommunes || !selectedWilaya || visibleCommunes.length === 0}
-                    >
-                      <option value="">
-                        {loadingCommunes
-                          ? lang === "ar" ? "تحميل…" : "Chargement…"
-                          : visibleCommunes.length
-                            ? delivery === "stop"
-                              ? lang === "ar" ? "اختر مكتب الاستلام" : "Choisir le point stop desk"
-                              : t("checkout.commune.placeholder")
-                            : t("checkout.commune.placeholderEmpty")}
-                      </option>
-                      {visibleCommunes.map((c) => (
-                        <option key={c.id} value={c.name}>
-                          {lang === "ar" && c.nameAr ? c.nameAr : c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </SelectShell>
-                </Field>
-
-                {/* Delivery method */}
+                {/* Delivery method first — the field below then adapts:
+                    commune for home, exact pickup point for stop-desk. */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <DeliveryOption
                     active={delivery === "home"}
@@ -488,6 +487,76 @@ export function QuickOrderDialog({
                       : "Pas de point stop desk dans cette wilaya — choisissez la livraison à domicile."}
                   </p>
                 ) : null}
+
+                {delivery === "stop" ? (
+                  <Field
+                    label={lang === "ar" ? "نقطة الاستلام" : "Point de retrait"}
+                    error={errors.commune}
+                  >
+                    <SelectShell
+                      disabled={loadingStopDesks || !selectedWilaya || stopDesks.length === 0}
+                    >
+                      <select
+                        value={stopDeskId}
+                        onChange={(e) => {
+                          setStopDeskId(e.target.value);
+                          clearError("commune");
+                        }}
+                        className={cn(
+                          inputCls(!!errors.commune),
+                          "cursor-pointer appearance-none pe-10",
+                          "disabled:cursor-not-allowed disabled:bg-cream-deep/40 disabled:text-wood-400 disabled:opacity-70",
+                        )}
+                        disabled={loadingStopDesks || !selectedWilaya || stopDesks.length === 0}
+                      >
+                        <option value="">
+                          {loadingStopDesks
+                            ? lang === "ar" ? "تحميل…" : "Chargement…"
+                            : lang === "ar" ? "اختر مكتب الاستلام" : "Choisir le point de retrait"}
+                        </option>
+                        {stopDesks.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                            {d.address ? ` — ${d.address}` : d.commune ? ` — ${d.commune}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectShell>
+                  </Field>
+                ) : (
+                  <Field label={t("checkout.commune")} error={errors.commune}>
+                    <SelectShell
+                      disabled={loadingCommunes || !selectedWilaya || communes.length === 0}
+                    >
+                      <select
+                        value={commune}
+                        onChange={(e) => {
+                          setCommune(e.target.value);
+                          clearError("commune");
+                        }}
+                        className={cn(
+                          inputCls(!!errors.commune),
+                          "cursor-pointer appearance-none pe-10",
+                          "disabled:cursor-not-allowed disabled:bg-cream-deep/40 disabled:text-wood-400 disabled:opacity-70",
+                        )}
+                        disabled={loadingCommunes || !selectedWilaya || communes.length === 0}
+                      >
+                        <option value="">
+                          {loadingCommunes
+                            ? lang === "ar" ? "تحميل…" : "Chargement…"
+                            : communes.length
+                              ? t("checkout.commune.placeholder")
+                              : t("checkout.commune.placeholderEmpty")}
+                        </option>
+                        {communes.map((c) => (
+                          <option key={c.id} value={c.name}>
+                            {lang === "ar" && c.nameAr ? c.nameAr : c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectShell>
+                  </Field>
+                )}
 
                 {RECAPTCHA_SITE_KEY ? (
                   <div className="mt-1">

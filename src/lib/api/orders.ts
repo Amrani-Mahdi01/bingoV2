@@ -12,10 +12,14 @@ export interface CreateOrderPayload {
   };
   shipping: {
     wilayaId: string;
-    commune: string;
+    /** Required for home delivery. For stop-desk the commune is derived from
+     *  the chosen desk, so it may be omitted (stopDeskId is sent instead). */
+    commune?: string;
     address?: string | null;
     /** "home" (à domicile) or "stopdesk" (retrait en agence). Defaults home. */
     deliveryType?: "home" | "stopdesk";
+    /** The exact ZR pickup point chosen — required for stop-desk orders. */
+    stopDeskId?: string | null;
     notes?: string | null;
   };
   lines: Array<{
@@ -89,6 +93,9 @@ export interface ApiOrder {
     commune: string;
     address: string | null;
     deliveryType: "home" | "stopdesk";
+    /** Chosen ZR pickup point (stop-desk orders): id + clean display name. */
+    stopDeskId: string | null;
+    stopDesk: string | null;
     notes: string | null;
   };
   subtotal: number;

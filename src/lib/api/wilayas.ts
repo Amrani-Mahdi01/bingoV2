@@ -1,7 +1,7 @@
 "use client";
 
 import { http } from "@/lib/api/http";
-import type { Commune, Wilaya } from "@/lib/types";
+import type { Commune, StopDesk, Wilaya } from "@/lib/types";
 
 interface ListResponse {
   data: Wilaya[];
@@ -11,6 +11,9 @@ interface SingleResponse {
 }
 interface CommuneListResponse {
   data: Commune[];
+}
+interface StopDeskListResponse {
+  data: StopDesk[];
 }
 interface CommuneSingleResponse {
   data: Commune;
@@ -96,6 +99,16 @@ export const wilayasApi = {
   listCommunesPublic(wilayaId: string): Promise<Commune[]> {
     return http
       .get<CommuneListResponse>(`/api/wilayas/${wilayaId}/communes`, {
+        auth: "none",
+      })
+      .then((r) => r.data);
+  },
+
+  /** ZR stop desks (pickup points) in a wilaya — public, used by checkout
+   *  when the customer picks stop-desk delivery. */
+  listStopDesksPublic(wilayaId: string): Promise<StopDesk[]> {
+    return http
+      .get<StopDeskListResponse>(`/api/wilayas/${wilayaId}/stopdesks`, {
         auth: "none",
       })
       .then((r) => r.data);
