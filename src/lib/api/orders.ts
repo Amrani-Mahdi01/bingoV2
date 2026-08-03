@@ -143,9 +143,12 @@ export interface UpdateOrderPayload {
   };
   shipping: {
     wilayaId: string;
-    commune: string;
+    /** Required for home; for stop-desk it's derived from the chosen desk. */
+    commune?: string;
     address?: string | null;
     deliveryType: "home" | "stopdesk";
+    /** Chosen ZR pickup point — required when deliveryType is "stopdesk". */
+    stopDeskId?: string | null;
     notes?: string | null;
   };
   /** Manual delivery-fee override. Null/omitted bills the wilaya's rate. */

@@ -39,7 +39,7 @@ import {
 import { wilayasApi } from "@/lib/api/wilayas";
 import { formatDZD } from "@/lib/format";
 import { mediaUrl } from "@/lib/media";
-import type { Commune, Wilaya } from "@/lib/types";
+import type { Commune, StopDesk, Wilaya } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Editable working copy of an order line. */
@@ -103,6 +103,10 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
   const [wilayas, setWilayas] = React.useState<Wilaya[]>([]);
   const [communes, setCommunes] = React.useState<Commune[]>([]);
   const [communesLoading, setCommunesLoading] = React.useState(false);
+  // Stop-desk (ZR pickup points) for the wilaya + the chosen desk id.
+  const [stopDesks, setStopDesks] = React.useState<StopDesk[]>([]);
+  const [stopDesksLoading, setStopDesksLoading] = React.useState(false);
+  const [stopDeskId, setStopDeskId] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   // Product picker
@@ -121,6 +125,7 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
     setCommune(order.shipping.commune);
     setAddress(order.shipping.address ?? "");
     setDeliveryType(order.shipping.deliveryType);
+    setStopDeskId(order.shipping.stopDeskId ?? "");
     setNotes(order.shipping.notes ?? "");
     setShippingFee(order.shippingFee);
     setFeeManual(false);
@@ -186,6 +191,32 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
     };
   }, [open, wilayaId]);
 
+  // Load the wilaya's stop desks (ZR pickup points) for the desk dropdown.
+  // Keeps the current stopDeskId untouched — the init effect owns that.
+  React.useEffect(() => {
+    if (!open || !wilayaId) {
+      setStopDesks([]);
+      setStopDesksLoading(false);
+      return;
+    }
+    let active = true;
+    setStopDesksLoading(true);
+    wilayasApi
+      .listStopDesksPublic(wilayaId)
+      .then((d) => {
+        if (active) setStopDesks(d);
+      })
+      .catch(() => {
+        if (active) setStopDesks([]);
+      })
+      .finally(() => {
+        if (active) setStopDesksLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, wilayaId]);
+
   // Debounced product search for the "add product" picker.
   React.useEffect(() => {
     const q = query.trim();
@@ -228,8 +259,9 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
 
   const onWilayaChange = (wid: string) => {
     setWilayaId(wid);
-    // The old commune belongs to the old wilaya — force a fresh pick.
+    // The old commune / desk belong to the old wilaya — force a fresh pick.
     setCommune("");
+    setStopDeskId("");
     if (!feeManual) {
       const f = computeFee(wid, deliveryType);
       if (f !== null) setShippingFee(f);
@@ -301,7 +333,7 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
     lastName.trim() !== "" &&
     phone.trim() !== "" &&
     wilayaId !== "" &&
-    commune.trim() !== "" &&
+    (deliveryType === "stopdesk" ? stopDeskId !== "" : commune.trim() !== "") &&
     lines.length > 0 &&
     !saving;
 
@@ -319,7 +351,9 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
       },
       shipping: {
         wilayaId,
-        commune: commune.trim(),
+        // Home → commune; stop-desk → the exact desk (commune derived server-side).
+        commune: commune.trim() || undefined,
+        ...(deliveryType === "stopdesk" ? { stopDeskId } : {}),
         address: address.trim() || null,
         deliveryType,
         notes: notes.trim() || null,
@@ -622,36 +656,69 @@ export function OrderEditSheet({ order, open, onOpenChange, onSaved }: Props) {
               </select>
             </Field>
 
-            <Field label="Commune">
-              {communesLoading || communes.length > 0 ? (
-                <select
-                  value={commune}
-                  onChange={(e) => setCommune(e.target.value)}
-                  disabled={communesLoading && communes.length === 0}
-                  className="h-11 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring disabled:opacity-50"
-                >
-                  <option value="" disabled>
-                    {communesLoading ? "Chargement…" : "Choisir une commune"}
-                  </option>
-                  {/* Preserve a current value that isn't in the list. */}
-                  {commune && !communes.some((c) => c.name === commune) ? (
-                    <option value={commune}>{commune}</option>
-                  ) : null}
-                  {communes.map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}
+            {deliveryType === "stopdesk" ? (
+              <Field label="Point de retrait">
+                {stopDesksLoading || stopDesks.length > 0 ? (
+                  <select
+                    value={stopDeskId}
+                    onChange={(e) => setStopDeskId(e.target.value)}
+                    disabled={stopDesksLoading && stopDesks.length === 0}
+                    className="h-11 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring disabled:opacity-50"
+                  >
+                    <option value="" disabled>
+                      {stopDesksLoading ? "Chargement…" : "Choisir le point de retrait"}
                     </option>
-                  ))}
-                </select>
-              ) : (
-                // Wilaya has no communes seeded — free text so we never block.
-                <Input
-                  value={commune}
-                  onChange={(e) => setCommune(e.target.value)}
-                  placeholder="Commune"
-                />
-              )}
-            </Field>
+                    {/* Preserve the current desk if it's not in the loaded list. */}
+                    {stopDeskId && !stopDesks.some((d) => d.id === stopDeskId) ? (
+                      <option value={stopDeskId}>
+                        {order.shipping.stopDesk ?? "Point de retrait actuel"}
+                      </option>
+                    ) : null}
+                    {stopDesks.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                        {d.address ? ` — ${d.address}` : d.commune ? ` — ${d.commune}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    Aucun point stop desk dans cette wilaya.
+                  </p>
+                )}
+              </Field>
+            ) : (
+              <Field label="Commune">
+                {communesLoading || communes.length > 0 ? (
+                  <select
+                    value={commune}
+                    onChange={(e) => setCommune(e.target.value)}
+                    disabled={communesLoading && communes.length === 0}
+                    className="h-11 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring disabled:opacity-50"
+                  >
+                    <option value="" disabled>
+                      {communesLoading ? "Chargement…" : "Choisir une commune"}
+                    </option>
+                    {/* Preserve a current value that isn't in the list. */}
+                    {commune && !communes.some((c) => c.name === commune) ? (
+                      <option value={commune}>{commune}</option>
+                    ) : null}
+                    {communes.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  // Wilaya has no communes seeded — free text so we never block.
+                  <Input
+                    value={commune}
+                    onChange={(e) => setCommune(e.target.value)}
+                    placeholder="Commune"
+                  />
+                )}
+              </Field>
+            )}
 
             <Field label="Adresse">
               <Input
